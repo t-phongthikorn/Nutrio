@@ -1,0 +1,19 @@
+{
+  "name": "nutrio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:client": "npm run dev --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:ml": "pyservice\\fastml\\Scripts\\python.exe -m uvicorn pyservice.mlapi:app --reload",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\" \"npm run dev:ml\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
