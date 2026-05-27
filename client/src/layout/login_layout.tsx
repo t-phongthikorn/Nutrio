@@ -7,10 +7,10 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 type ErrorStatus =
-    | "EMAIL_NOT_FOUND"
-    | "INVALID_PASSWORD"
-    | "MISSING_FIELDS"
-    | null;
+  | "EMAIL_NOT_FOUND"
+  | "INVALID_PASSWORD"
+  | "MISSING_FIELDS"
+  | null;
 
 function login_layout() {
   const [visibility, setVisiblity] = useState(false);
@@ -19,28 +19,30 @@ function login_layout() {
   const userRef = useRef<HTMLInputElement>(null);
   const [errorStatus, setErrorStatus] = useState<ErrorStatus>(null);
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
+    setIsLoading(true);
     try {
-      console.log("TRY TO LOGIN")
-      const response = await axios.post(
-        "/api/auth/login",
-        { email, password }
-      );
-      const data = response?.data
-      console.log(data)
+      console.log("TRY TO LOGIN");
+      const response = await axios.post("/api/auth/login", { email, password });
+      const data = response?.data;
+      console.log(data);
       if (response.data) {
         navigate("/");
         navigate(0);
       }
+
       // const userName = response?.data?.accessToken;
-    } catch (err : any) {
-        setErrorStatus(err.response?.data.errorCode)
-        if (errorStatus == "INVALID_PASSWORD") setPassword("");
-        else if (errorStatus == "EMAIL_NOT_FOUND") { setPassword("") }
+    } catch (err: any) {
+      setErrorStatus(err.response?.data.errorCode);
+      if (errorStatus == "INVALID_PASSWORD") setPassword("");
+      else if (errorStatus == "EMAIL_NOT_FOUND") {
+        setPassword("");
+      }
     }
+    setIsLoading(false);
   };
   // useEffect(() => {
   //   userRef.current?.focus();
@@ -66,8 +68,6 @@ function login_layout() {
   //   getUsers();
   // }, []);
 
-
-
   return (
     <>
       <div className="flex items-center justify-center min-h-screen p-4">
@@ -85,7 +85,9 @@ function login_layout() {
               <div>
                 <div className="mb-3">Email (อีเมลล์)</div>
 
-                <div className={`w-full p-3 border rounded-4xl ${errorStatus == "EMAIL_NOT_FOUND" ? "border-red-500" : "border-gray-500"} flex flex-row gap-4 items-center`}>
+                <div
+                  className={`w-full p-3 border rounded-4xl ${errorStatus == "EMAIL_NOT_FOUND" ? "border-red-500" : "border-gray-500"} flex flex-row gap-4 items-center`}
+                >
                   <PersonIcon className="fill-gray-500" />
 
                   <input
@@ -103,12 +105,20 @@ function login_layout() {
                     }}
                   />
                 </div>
-                {errorStatus == "EMAIL_NOT_FOUND" ? <div className="text-red-500">ไม่พบ Email ดังกล่าวในระบบ กรุณาลงทะเบียน</div> : ""}
+                {errorStatus == "EMAIL_NOT_FOUND" ? (
+                  <div className="text-red-500">
+                    ไม่พบ Email ดังกล่าวในระบบ กรุณาลงทะเบียน
+                  </div>
+                ) : (
+                  ""
+                )}
               </div>
 
               <div>
                 <div className="mb-3">Password (รหัสผ่าน)</div>
-                <div className={`w-full p-3 border rounded-4xl ${errorStatus == "INVALID_PASSWORD" ? "border-red-500" : "border-gray-500"}  flex flex-row gap-4 items-center"`}>
+                <div
+                  className={`w-full p-3 border rounded-4xl ${errorStatus == "INVALID_PASSWORD" ? "border-red-500" : "border-gray-500"}  flex flex-row gap-4 items-center"`}
+                >
                   <LockIcon className="fill-gray-500" />
 
                   <input
@@ -137,13 +147,17 @@ function login_layout() {
                     )}
                   </button>
                 </div>
-                  {errorStatus == "INVALID_PASSWORD" ? <div className="text-red-500">คุณกรอกรหัสผ่านไม่ถูกต้อง</div> : ""}
+                {errorStatus == "INVALID_PASSWORD" ? (
+                  <div className="text-red-500">คุณกรอกรหัสผ่านไม่ถูกต้อง</div>
+                ) : (
+                  ""
+                )}
               </div>
 
               <button
                 type="submit"
                 className={`w-full px-6 py-3 text-center uppercase transition-all duration-500
-    bg-size-[150%_auto] ${password.length >= 8 && /@/.test(email) ? "bg-linear-to-r from-[#99eed6] via-[#8fe9eb] to-[#38afd6] cursor-pointer hover:bg-right hover:scale-[1.02]" : "bg-gray-300"}
+    bg-size-[150%_auto] ${password.length >= 8 && /@/.test(email) ? "bg-linear-to-r from-[#70fad3] via-[#38afd6] to-[#38afd6] cursor-pointer hover:bg-right hover:scale-[1.02]" : "bg-gray-300"}
     text-white shadow-[0_0_20px_#eee] rounded-4xl
      outline-none border-none 
     kanit-bold `}
@@ -151,6 +165,12 @@ function login_layout() {
                 เข้าสู่ระบบ
               </button>
             </form>
+            {isLoading && (
+              <div className="flex flex-row justify-center gap-3">
+                <div className="text-gray-30">กำลังโหลด</div>
+                <span className="loading loading-spinner text-gray-300 loading-md"></span>
+              </div>
+            )}
           </div>
         </div>
       </div>

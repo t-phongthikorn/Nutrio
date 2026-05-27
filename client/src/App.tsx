@@ -15,8 +15,8 @@ function App() {
       <Routes>
         {/* Layout ที่มี Sidebar */}
         <Route element={<MainLayout />}>
-          <Route path="/" element={<Home />} />
           <Route element = {<ProtectedRoute/>}>
+            <Route path="/" element={<Home />} />
             <Route path="/meal" element={<Meal />} />
             <Route path="/workout" element={<Workout />} />
           </Route>
