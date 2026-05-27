@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser"
 import bcrypt from "bcryptjs"
 import authRoutes from "./routes/auth"
+import transactionRoutes from "./routes/transaction"
 
 import * as dotenv from "dotenv";
 dotenv.config()
@@ -22,6 +23,7 @@ app.use(cookieParser())
 app.use(express.json())
 
 app.use("/api/auth", authRoutes)
+app.use("/transaction", transactionRoutes)
 
 app.get("/", (req, res) => {
   res.send("Hello TypeScript");

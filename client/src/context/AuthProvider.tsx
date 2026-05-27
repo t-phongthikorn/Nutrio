@@ -1,12 +1,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import axios from "../api/axios";
+import { getAccessToken, setAccessToken } from "../api/token";
 
 type AuthType = {
     user: any;
-    isAuthenticated: boolean;
     loading: boolean;
     setAuth: React.Dispatch<React.SetStateAction<any>>;
-    token: any;
 };
 
 
@@ -16,9 +15,7 @@ const AuthContext = createContext<AuthType | null>(null);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [auth, setAuth] = useState({
         user: null,
-        isAuthenticated: false,
         loading: true,
-        token: ""
     });
     useEffect(() => {
         const fetchMe = async () => {
@@ -26,19 +23,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 const response = await axios.get('/api/auth/me');
                 console.log(response.data)
                 if (response.data) {
+                    console.log(response.data)
+                    setAccessToken(response.data?.accessToken)
                     setAuth({
                         user: null,
-                        isAuthenticated: true,
                         loading: false,
-                        token: response.data?.acessToken
                     })
                 }
             } catch {
                 setAuth({
                     user: null,
-                    isAuthenticated: false,
                     loading: false,
-                    token: ""
                 });
             }
         }

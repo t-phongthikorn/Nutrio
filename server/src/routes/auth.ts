@@ -99,6 +99,22 @@ router.post('/login', async (req, res) => {
 
 })
 
+router.post('/refresh', async (req, res) => {
+
+    const token = req.cookies.refreshToken;
+    
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!);
+        if (typeof decoded === "string") {
+            return res.sendStatus(401);
+        }
+        return res.json({accessToken: generateAcessToken(decoded.user_id)})
+
+    } catch (err) {
+        return res.sendStatus(401);
+    }
+})
+
 router.get('/me', async (req, res) => {
 
     const token = req.cookies.refreshToken;
@@ -108,7 +124,7 @@ router.get('/me', async (req, res) => {
         if (typeof decoded === "string") {
             return res.sendStatus(401);
         }
-        return res.json({acessToken: generateAcessToken(decoded.user_id)})
+        return res.json({accessToken: generateAcessToken(decoded.user_id)})
 
     } catch (err) {
         return res.sendStatus(401);
@@ -210,7 +226,7 @@ const getRefreshToken = async (user_id: any) => {
 
 const generateAcessToken = (user_id: any) => {
     return jwt.sign({ user_id }, process.env.JWT_SECRET!, {
-        expiresIn: process.env.ACCESS_TOKEN_EXPIRES as any || '7d'
+        expiresIn: process.env.ACCESS_TOKEN_EXPIRES as any || '5m'
     })
 }
 

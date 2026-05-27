@@ -1,7 +1,31 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+.react-datepicker {
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+  font-family: inherit;
+}
 
+.react-datepicker__header {
+  background-color: oklch(var(--b1));
+  border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__time-list-item--selected {
+  background-color: oklch(var(--p));
+  color: oklch(var(--pc));
+}
+
+.react-datepicker__day:hover {
+  background-color: oklch(var(--b2));
+}
+
+.react-datepicker__time-container {
+  border-left: 1px solid oklch(var(--bc) / 0.1);
+}
 /* .logo {
   height: 6em;
   padding: 1.5em;
