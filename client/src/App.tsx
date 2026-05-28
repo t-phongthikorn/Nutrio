@@ -1,8 +1,8 @@
 import { Routes } from "react-router";
 import "./App.css";
 import { Route } from "react-router";
-import Home from "./routes/home";
-import Meal from "./routes/meal";
+import Home from "./routes/save";
+import Meal from "./routes/list";
 import Workout from "./routes/workout";
 import LoginLayout from "./layout/login_layout";
 import RegisterLayout from "./layout/register_layout";

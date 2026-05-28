@@ -6,6 +6,9 @@
   font-style: normal;
 }
 
+
+
+
 prompt-thin {
   font-family: "Prompt", sans-serif;
   font-weight: 100;
@@ -249,7 +252,7 @@ prompt-thin {
 }
 body {
   overflow-x: hidden;
-  background-color: #fffdfa;
+  background-color: #fafafa;
   background: white;
   background-image: radial-gradient(rgb(238, 238, 238) 0.1rem, transparent 0);
   background-size: 40px 40px;

@@ -60,7 +60,7 @@ const transformTransactionMap = (
   });
 };
 
-const Meal = () => {
+const SaveTransaction = () => {
   const [currentCommand, setCurrentCommand] = useState("");
   const [lastCommand, setLastCommand] = useState("");
   const [targetDeleteId, setTargetDeleteId] = useState("");
@@ -579,6 +579,7 @@ const Meal = () => {
                               <td>
                                 <DatePicker
                                   selected={transaction.time}
+                                  portalId="root-portal"
                                   onChange={(date: any) => {
                                     setTransactionMap((prev) => ({
                                       ...prev,
@@ -592,7 +593,7 @@ const Meal = () => {
                                   timeInputLabel="Time:"
                                   dateFormat="dd/MM/yyyy HH:mm"
                                   className="input input-bordered w-full  "
-                                  calendarClassName="rounded-box shadow-xl border border-base-300"
+                                  calendarClassName="rounded-box shadow-xl border border-base-300 w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                   popperClassName="z-50"
                                   popperPlacement="bottom-start"
                                 />
@@ -708,4 +709,4 @@ const Meal = () => {
   );
 };
 
-export default Meal;
+export default SaveTransaction;
