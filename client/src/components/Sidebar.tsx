@@ -1,7 +1,7 @@
 import Logo from "../assets/logo.svg?react";
 import CloseMenuIcon from "../assets/icon/menu.svg?react";
-import FoodMenuIcon from "../assets/icon/food.svg?react";
-import WorkoutMenuIcon from "../assets/icon/workout.svg?react";
+import SaveMenuIcon from "../assets/icon/save.svg?react";
+import ListMenuIcon from "../assets/icon/list.svg?react";
 
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
@@ -64,12 +64,12 @@ const SideBar = () => {
         {/* Navigation */}
         <nav className="flex flex-col gap-2">
           <NavLink to="/" end className={navClass}>
-            <FoodMenuIcon className="w-6 h-6" />
+            <SaveMenuIcon className="w-6 h-6" />
             <span className="font-medium">บันทึก</span>
           </NavLink>
 
           <NavLink to="/Meal" className={navClass}>
-            <FoodMenuIcon className="w-6 h-6" />
+            <ListMenuIcon className="w-6 h-6" />
             <span className="font-medium">รายการ</span>
           </NavLink>
 
@@ -107,12 +107,12 @@ const SideBar = () => {
     "
         >
           <NavLink to="/" end className={navClass}>
-            <FoodMenuIcon className="w-6 h-6" />
+            <SaveMenuIcon className="w-6 h-6" />
             <span className="font-medium">บันทึก</span>
           </NavLink>
 
           <NavLink to="/Meal" className={navClass}>
-            <FoodMenuIcon className="w-6 h-6" />
+            <ListMenuIcon className="w-6 h-6" />
             <span className="font-medium">รายการ</span>
           </NavLink>
 

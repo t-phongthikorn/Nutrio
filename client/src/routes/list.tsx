@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axiosInstance from "../api/axios";
 import { Doughnut } from "react-chartjs-2";
 import { useDoughnutCharts } from "../components/graph";
+import BackgroundIcon from "../components/background_icon";
+import getOwnPagination from "../utils/pagination";
+
+import FoodSvg from "../assets/food.svg";
 
 export interface Transaction {
   id: number;
@@ -26,14 +30,20 @@ interface GroupedTransactions {
 const formatThaiDate = (dateString: string): string => {
   const date = new Date(dateString);
 
-  // ดึงชื่อเดือนแบบย่อภาษาไทย (ม.ค., ก.พ., ...)
-  const month = date.toLocaleDateString("th-TH", { month: "short" });
-  const day = date.getDate();
+  // 1. เช็คก่อนว่า Format วันที่ส่งมาถูกต้องไหม ถ้าระบบอ่านไม่ออก ให้ส่งสตริงว่างหรือค่าเดิมกลับไปก่อน กันแอปพัง
+  if (isNaN(date.getTime())) {
+    return dateString;
+  }
 
-  // แปลงปี ค.ศ. เป็น พ.ศ. แล้วเอาแค่ 2 หลักท้าย (เช่น 2026 -> 2569 -> "69")
-  const thaiYear = (date.getFullYear() + 543).toString().slice(-2);
+  // 2. ใช้ option "2-digit" สำหรับปี เพื่อให้ตัดเหลือ 2 หลักท้าย (เช่น "69") อัตโนมัติในระบบ พ.ศ.
+  const formatted = date.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "2-digit",
+  });
 
-  return `${day} ${month} ${thaiYear}`;
+  // ผลลัพธ์ที่ได้จาก th-TH จะหน้าตาประมาณ "28 พ.ค. 69"
+  return formatted;
 };
 
 const groupTransactionsByDate = (
@@ -102,6 +112,14 @@ const TransactionList = () => {
 
   const [startDateTime, setStartDateTime] = useState<Date | null>(startOfMonth);
   const [endDateTime, setEndDateTime] = useState<Date | null>(endOfMonth);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const [viewStartDateTime, setViewStartDateTime] = useState<Date | null>(
+    startOfMonth,
+  );
+  const [viewEndDateTime, setViewEndDateTime] = useState<Date | null>(
+    startOfMonth,
+  );
 
   const initialTransactions: Transaction[] = [
     {
@@ -212,6 +230,66 @@ const TransactionList = () => {
       time: "2026-05-28T12:19:46.715+00:00",
       transaction_id: "4eb0b41a-b5fc-4746-8704-ffc230a0d029",
     },
+    {
+      id: 71,
+      created_at: "2026-05-28T12:29:18.61517+00:00",
+      user_id: "f8248bc6-2f5a-433a-b77e-beb4ca46646e",
+      amount: 100,
+      title: "ขายระบบ",
+      label: "อื่น ๆ", // ปรับตัวอักษรให้แมตช์กับสี Pantone "อื่น ๆ"
+      type: "income",
+      note: "",
+      time: "2026-05-28T12:26:13.895+00:00",
+      transaction_id: "0c9f6cad-8f97-460b-8571-207b14ae7f24",
+    },
+    {
+      id: 72,
+      created_at: "2026-05-28T12:29:18.61517+00:00",
+      user_id: "f8248bc6-2f5a-433a-b77e-beb4ca46646e",
+      amount: 1000,
+      title: "อี๋งเปา",
+      label: "ของขวัญ",
+      type: "income",
+      note: "",
+      time: "2026-05-28T12:26:14.47+00:00",
+      transaction_id: "e9ec2f92-5c5a-4b8e-b27c-b6d79064334e",
+    },
+    {
+      id: 73,
+      created_at: "2026-05-28T12:29:18.61517+00:00",
+      user_id: "f8248bc6-2f5a-433a-b77e-beb4ca46646e",
+      amount: 3000,
+      title: "กู้กยศ.",
+      label: "เงินกู้ยืม",
+      type: "income",
+      note: "",
+      time: "2026-05-28T12:26:14.966+00:00",
+      transaction_id: "dd80ff7d-c1ac-45b6-897b-f7076c4898be",
+    },
+    {
+      id: 74,
+      created_at: "2026-05-28T12:29:18.61517+00:00",
+      user_id: "f8248bc6-2f5a-433a-b77e-beb4ca46646e",
+      amount: 9000,
+      title: "แม่",
+      label: "เงินเดือน",
+      type: "income",
+      note: "ฟหกไฟหกไฟกห",
+      time: "2026-05-28T12:26:15.862+00:00",
+      transaction_id: "fa68933e-7e90-49f2-a9a2-05677e42ad12",
+    },
+    {
+      id: 75,
+      created_at: "2026-05-28T12:29:18.61517+00:00",
+      user_id: "f8248bc6-2f5a-433a-b77e-beb4ca46646e",
+      amount: 1000,
+      title: "Part Time",
+      label: "รายได้พิเศษ",
+      type: "income",
+      note: "",
+      time: "2026-05-28T12:26:24.731+00:00",
+      transaction_id: "4adcc27b-e6f5-4276-9858-f36567ba3c07",
+    },
   ];
 
   const [currentTransaction, setCurrentTransaction] =
@@ -220,12 +298,38 @@ const TransactionList = () => {
     GroupedTransactions[]
   >([]);
   const { incomeData, expenseData } = useDoughnutCharts(initialTransactions);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(initialTransactions.length / itemsPerPage);
+  const pages = getOwnPagination(currentPage, totalPages);
+  const [useIncomeData, setUseIncomeData] = useState(true);
+  const [useExpenseData, setUseExpenseData] = useState(true);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([
+    "ช้อปปิ้งและของใช้",
+    "อาหาร",
+    "เดินทาง",
+    "บันเทิง",
+    "ค่าใช้จ่ายประจำ",
+    "สุขภาพและยา",
+    "ซ่อมบำรุง",
+    "ธุรกิจ",
+    "ของขวัญ",
+    "เงินกู้ยืม",
+    "เงินเดือน",
+    "รายได้พิเศษ",
+    "อื่น ๆ",
+  ]);
   const hasIncomeData = incomeData.datasets[0].data.some((v) => v > 0);
   const hasExpenseData = expenseData.datasets[0].data.some((v) => v > 0);
   useEffect(() => {
-    setCurrentGroupedTransaction(groupTransactionsByDate(currentTransaction));
+    setCurrentGroupedTransaction(groupTransactionsByDate(initialTransactions));
     console.log(currentGroupedTransaction);
   }, []);
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [currentPage]);
 
   const fetchDataByRange = async () => {
     console.log("Try to fetch");
@@ -244,6 +348,57 @@ const TransactionList = () => {
   // useEffect(() => {
   //   fetchDataByRange()
   // }, [startDateTime, endDateTime]); // 👈 สำคัญมาก
+
+  const groupedData = useMemo(() => {
+    console.log("🔄 กำลังประมวลผลข้อมูลขั้นตอนที่ถูกต้อง...");
+
+    // ─── STEP 1: กรองฟิลเตอร์ทั้งหมดก่อน (จากข้อมูลดิบทั้งหมด initialTransactions) ───
+    const filteredTransactions = initialTransactions.filter((item) => {
+      // 1. กรองตามประเภท (Checkbox)
+      if (item.type === "income" && !useIncomeData) return false;
+      if (item.type === "expense" && !useExpenseData) return false;
+
+      // 2. กรองตามหมวดหมู่ (Label Filter)
+      if (selectedLabels.length > 0 && !selectedLabels.includes(item.label)) {
+        return false;
+      }
+
+      // 3. กรองตามช่วงวันที่
+      const itemTime = new Date(item.time).getTime();
+      const start = viewStartDateTime
+        ? new Date(viewStartDateTime).setHours(0, 0, 0, 0)
+        : 0;
+      const end = viewEndDateTime
+        ? new Date(viewEndDateTime).setHours(23, 59, 59, 999)
+        : Infinity;
+
+      return itemTime >= start && itemTime <= end;
+    });
+
+    // ─── STEP 2: 🔥 เรียงลำดับข้อมูลที่กรองเสร็จแล้ว จากใหม่สุดไปเก่าสุด ───
+    // ป้องกันปัญหาวันที่กระโดดไปมาข้ามหน้า
+    const sortedTransactions = filteredTransactions.sort(
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+    );
+
+    // ─── STEP 3: 🔥 ทำ Pagination (แบ่งหน้า) จากข้อมูลที่จัดระเบียบเสร็จแล้ว ───
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const pageTransaction = sortedTransactions.slice(
+      startIndex,
+      startIndex + itemsPerPage,
+    );
+
+    // ─── STEP 4: ส่งข้อมูลของหน้านั้น ๆ ไปจัดกลุ่มตามวัน ───
+    return groupTransactionsByDate(pageTransaction);
+  }, [
+    initialTransactions, // 💡 แนะนำให้เช็คคำนี้ในโปรเจกต์ด้วยนะครับ (ในโค้ดเดิมแอบใส่ตัวแปรผิดชื่อที่ Dependency)
+    viewStartDateTime,
+    viewEndDateTime,
+    useIncomeData,
+    useExpenseData,
+    selectedLabels,
+    currentPage,
+  ]);
 
   return (
     <div className="max-w-7xl mx-auto p-4">
@@ -284,6 +439,11 @@ const TransactionList = () => {
             className="input input-bordered w-full rounded-4xl flex-1"
           />
         </div>
+      </div>
+      <div className="w-full items-center text-center mt-5">
+        <button className="btn btn-info btn-outline rounded-4xl w-1/2">
+          ค้นหา
+        </button>
       </div>
       <div className="flex items-center w-1/2 my-6 mx-auto mt-16">
         <div className="grow border-t border-gray-300"></div>
@@ -352,6 +512,231 @@ const TransactionList = () => {
           </div>
         </div>
       )}
+      <div className="flex items-center w-1/2 my-6 mx-auto mt-16">
+        <div className="grow border-t border-gray-300"></div>
+
+        <span className="mx-4 text-gray-600 text-3xl text-center">
+          รายละเอียด
+        </span>
+
+        <div className="grow border-t border-gray-300"></div>
+      </div>
+
+      <div className="w-full md:w-auto items-center bg-white shadow-lg flex flex-col md:flex-row md:items-center p-4 rounded-4xl mb-3 gap-4">
+        {/* LEFT (checkbox + button) */}
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={useIncomeData}
+              onChange={(e) => setUseIncomeData(e.target.checked)}
+              className="checkbox checkbox-md  rounded-lg"
+            />
+            <div className="text-xl">รายรับ</div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              checked={useExpenseData}
+              onChange={(e) => setUseExpenseData(e.target.checked)}
+              className="checkbox checkbox-md rounded-lg"
+            />
+            <div className="text-xl">รายจ่าย</div>
+          </div>
+
+          <button className="btn rounded-4xl text-lg">คัดกรอง</button>
+        </div>
+
+        {/* RIGHT (datepicker) */}
+        <div className="flex items-center gap-2 w-full md:w-[320px] md:ml-auto justify-center md:justify-end">
+          <DatePicker
+            selected={viewStartDateTime}
+            onChange={(e: any) => {
+              setViewStartDateTime(e);
+            }}
+            dateFormat="dd/MM/yyyy"
+            calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input input-bordered w-full rounded-4xl flex-1  "
+          />
+
+          <div className="text-gray-600 text-sm whitespace-nowrap">ถึง</div>
+
+          <DatePicker
+            selected={viewEndDateTime}
+            onChange={(e: any) => {
+              setViewEndDateTime(e);
+            }}
+            dateFormat="dd/MM/yyyy"
+            calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input input-bordered w-full rounded-4xl flex-1  "
+          />
+        </div>
+      </div>
+
+      <div className="hidden sm:grid bg-white shadow-2xl rounded-4xl cursor-pointer  focus:outline-none focus:ring-2 focus:ring-blue-500 p-7">
+        {/* 1. เอา Object.keys ออก แล้ว map ดื้อ ๆ เลย */}
+        {groupedData.map((group) => {
+          // 2. ดึง group.date (ซึ่งมีค่าเป็น "2026-05-28") ไปส่งให้ฟังก์ชันแปลงวันที่
+          return (
+            <div>
+              <div key={group.date} className="flex items-center gap-4 mb-3">
+                <div className="text-lg text-gray-700 font-medium whitespace-nowrap">
+                  {formatThaiDate(group.date)}{" "}
+                  {/* ✅ ได้ "28 พ.ค. 69" แน่นอน! */}
+                </div>
+                <div className="flex-1 h-[1px] bg-gray-400"></div>
+              </div>
+              {group.items.map((items) => {
+                return (
+                  <div className="">
+                    <div className="hidden sm:grid grid-cols-5  mb-1 items-center hover:bg-gray-100 p-2 rounded-4xl">
+                      <div>
+                        <div className="flex flex-row gap-4 items-center">
+                          <BackgroundIcon
+                            category={items.label}
+                          ></BackgroundIcon>
+                          <div className="text-gray-700">{items.label}</div>
+                        </div>
+                      </div>
+                      <div className="text-gray-700">{items.title}</div>
+                      <div>-</div>
+                      <div>{items.note}</div>
+                      <div
+                        className={`text-right font-semibold ${items.type === "income" ? "text-success" : "text-error"}`}
+                      >
+                        {items.type === "income" ? "+" : "-"}
+                        {Math.abs(items.amount).toLocaleString()} บาท
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {groupedData.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-xl">
+            ไม่มีรายการธุรกรรมในช่วงนี้
+          </div>
+        )}
+
+        <div className="mb-0"></div>
+      </div>
+
+      <div className="bg-white shadow-2xl rounded-4xl p-5 sm:hidden space-y-6">
+        {/* 1. วนลูปกลุ่มข้อมูลรายวัน (Grouped Data) */}
+        {groupedData.map((group) => (
+          <div key={group.date} className="space-y-3">
+            {/* 📅 หัวข้อวันที่ (DATE HEADER) */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm font-semibold text-gray-500 whitespace-nowrap">
+                {formatThaiDate(group.date)}{" "}
+                {/* ✅ แปลงวันที่ เช่น 28 พ.ค. 69 อัตโนมัติ */}
+              </span>
+              <div className="flex-1 h-px bg-gray-200"></div>
+            </div>
+
+            {/* 📝 รายการธุรกรรมภายในวันนั้น (LIST) */}
+            <div className="space-y-4">
+              {group.items.map((item) => {
+                // คำนวณสี เครื่องหมาย และยอดเงิน เตรียมไว้ล่วงหน้า
+                const isIncome = item.type === "income";
+                const textColor = isIncome ? "text-success" : "text-error";
+                const prefix = isIncome ? "+" : "-";
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between"
+                  >
+                    {/* ฝั่งซ้าย: ไอคอนและข้อมูลสินค้า */}
+                    <div className="flex items-center gap-3">
+                      {/* 🎨 เรียกใช้คอมโพเนนต์ไอคอนแยกตามหมวดหมู่พาสเทล */}
+                      <BackgroundIcon category={item.label} />
+
+                      <div>
+                        <p className="font-semibold text-base-content text-sm">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {item.label}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* ฝั่งขวา: ยอดเงินแยกสีตามประเภท */}
+                    <div
+                      className={`font-semibold text-xl text-right ${textColor}`}
+                    >
+                      {prefix}
+                      {Math.abs(item.amount).toLocaleString()} บาท
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {groupedData.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-sm">
+            ไม่มีรายการธุรกรรมในช่วงนี้
+          </div>
+        )}
+      </div>
+      <div className="flex justify-center items-center gap-2 mt-3 bg-white p-4 rounded-4xl shadow-2xl mb-5">
+        {/* Prev */}
+        <button
+          onClick={() => {
+            setCurrentPage((p) => Math.max(p - 1, 1));
+          }}
+          disabled={currentPage === 1}
+          className="px-3 py-1 rounded-xl bg-gray-200 disabled:opacity-50"
+        >
+          Prev
+        </button>
+
+        {/* Pages — fixed width container */}
+        <div className="flex items-center gap-2 w-64 justify-center">
+          {pages.map((p, index) =>
+            p === "..." ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="w-8 text-center text-gray-400"
+              >
+                ...
+              </span>
+            ) : (
+              <button
+                key={`page-${p}`}
+                onClick={() => {
+                  setCurrentPage(p);
+                }}
+                className={`w-8 h-8 rounded-4xl flex-shrink-0 ${
+                  currentPage === p
+                    ? "btn btn-accent text-white"
+                    : "btn btn-accen bg-gray-100"
+                }`}
+              >
+                {p}
+              </button>
+            ),
+          )}
+        </div>
+
+        {/* Next */}
+        <button
+          onClick={() => {
+            setCurrentPage((p) => Math.min(p + 1, totalPages));
+          }}
+          disabled={currentPage === totalPages}
+          className="px-3 py-1 btn rounded-xl bg-gray-200 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+      <div className="" ref={bottomRef}></div>
     </div>
   );
 };

@@ -3,6 +3,7 @@ import axios from "../api/axios";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useCopyToClipboard } from "@samithahansaka/clipboard";
+import BackgroundIcon from "../components/background_icon";
 
 interface LabelItem {
   text: string;
@@ -80,7 +81,7 @@ const SaveTransaction = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const CategoryMap = {
-    income: ["ธุรกิจ", "ของขวัญ", "เงินกู้ยืม", "เงินเดือน", "รายได้พิเศษ"],
+    income: ["ธุรกิจ", "ของขวัญ", "เงินกู้ยืม", "เงินเดือน", "รายได้พิเศษ", "อื่น ๆ"],
     expense: [
       "ช้อปปิ้งและของใช้",
       "อาหาร",
@@ -89,6 +90,7 @@ const SaveTransaction = () => {
       "ค่าใช้จ่ายประจำ",
       "สุขภาพและยา",
       "ซ่อมบำรุง",
+      "อื่น ๆ"
     ],
   };
 
@@ -563,12 +565,25 @@ const SaveTransaction = () => {
                                   >
                                     {transaction.type === "income"
                                       ? CategoryMap["income"].map((c) => (
-                                          <option key={c}>{c}</option>
+                                          <option key={c}>
+                                            <div className="flex flex-row gap-4 items-center">
+                                              <BackgroundIcon
+                                                category={c}
+                                              ></BackgroundIcon>
+                                              <div className="">{c}</div>
+                                            </div>
+                                          </option>
                                         ))
                                       : CategoryMap["expense"].map((c) => (
-                                          <option key={c}>{c}</option>
+                                          <option key={c}>
+                                            <div className="flex flex-row gap-4 items-center">
+                                              <BackgroundIcon
+                                                category={c}
+                                              ></BackgroundIcon>
+                                              <div className="">{c}</div>
+                                            </div>
+                                          </option>
                                         ))}
-                                    <option key="อื่น ๆ">อื่น ๆ</option>
                                   </select>
                                 ) : (
                                   <span className="badge badge-outline text-base whitespace-nowrap w-full p-3">
