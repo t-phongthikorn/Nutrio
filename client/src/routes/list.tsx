@@ -5,51 +5,28 @@ import axiosInstance from "../api/axios";
 import { Doughnut } from "react-chartjs-2";
 import { useDoughnutCharts } from "../components/graph";
 import BackgroundIcon from "../components/background_icon";
-import getOwnPagination from "../utils/pagination";
-
-import FoodSvg from "../assets/food.svg";
-import { EXPENSE_CATEGORIES_TH, INCOME_CATEGORIES_TH } from "../types/category";
-
-export interface Transaction {
-  id: number;
-  created_at: string;
-  user_id: string;
-  amount: number;
-  title: string;
-  label: string;
-  type: "expense" | "income" | string;
-  note: string | null;
-  time: string;
-  transaction_id: string;
-}
-
-interface GroupedTransactions {
-  date: string; // วันที่สำหรับใช้แสดงหัวข้อ (เช่น "2026-05-27")
-  items: Transaction[]; // รายการธุรกรรมของวันนั้น ๆ
-}
-
-const formatThaiDate = (dateString: string): string => {
-  const date = new Date(dateString);
-
-  // 1. เช็คก่อนว่า Format วันที่ส่งมาถูกต้องไหม ถ้าระบบอ่านไม่ออก ให้ส่งสตริงว่างหรือค่าเดิมกลับไปก่อน กันแอปพัง
-  if (isNaN(date.getTime())) {
-    return dateString;
-  }
-
-  // 2. ใช้ option "2-digit" สำหรับปี เพื่อให้ตัดเหลือ 2 หลักท้าย (เช่น "69") อัตโนมัติในระบบ พ.ศ.
-  const formatted = date.toLocaleDateString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: "2-digit",
-  });
-
-  // ผลลัพธ์ที่ได้จาก th-TH จะหน้าตาประมาณ "28 พ.ค. 69"
-  return formatted;
-};
+import {
+  getStartOfMonth,
+  getEndOfMonth,
+  formatThaiDate,
+} from "../utils/dateUtils";
+import { useFilteredTransaction } from "../hook/useFilteredTransaction";
+import { usePaginationTransaction } from "../hook/usePaginationTransaction";
+import {
+  GroupedTransactionsWithDate,
+  QueryTransaction,
+} from "../types/transaction";
+import { FilterByCategoryModal } from "../components/list/FilterByCategory";
+import { TransactionOverview } from "../components/list/TransactionOverview";
+import {
+  MobileTransactionList,
+  PCTransactionList,
+} from "../components/list/TransactionListView";
+import { TransactionPagination } from "../components/list/TransactionPagination";
 
 const groupTransactionsByDate = (
-  transactions: Transaction[],
-): GroupedTransactions[] => {
+  transactions: QueryTransaction[],
+): GroupedTransactionsWithDate[] => {
   // 1. จัดกลุ่มตามวันเหมือนเดิม
   const groups = transactions.reduce(
     (acc, transaction) => {
@@ -60,7 +37,7 @@ const groupTransactionsByDate = (
       acc[dateKey].push(transaction);
       return acc;
     },
-    {} as Record<string, Transaction[]>,
+    {} as Record<string, QueryTransaction[]>,
   );
 
   // 2. แปลงเป็น Array + เรียงลำดับ (Sort)
@@ -106,23 +83,19 @@ const options = {
 };
 
 const TransactionList = () => {
-  const now = new Date();
-
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-  const [startDateTime, setStartDateTime] = useState<Date | null>(startOfMonth);
-  const [endDateTime, setEndDateTime] = useState<Date | null>(endOfMonth);
+  const [startDateTime, setStartDateTime] = useState<Date | null>(() =>
+    getStartOfMonth(),
+  );
+  const [endDateTime, setEndDateTime] = useState<Date | null>(() =>
+    getEndOfMonth(),
+  );
+  useEffect(() => {
+    setTargetStartDate(startDateTime);
+    setTargetEndDate(endDateTime);
+  }, []);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const [viewStartDateTime, setViewStartDateTime] = useState<Date | null>(
-    startOfMonth,
-  );
-  const [viewEndDateTime, setViewEndDateTime] = useState<Date | null>(
-    startOfMonth,
-  );
-
-  const initialTransactions: Transaction[] = [
+  const initialTransactions: QueryTransaction[] = [
     {
       id: 63,
       created_at: "2026-05-27T11:42:27.052944+00:00",
@@ -294,40 +267,38 @@ const TransactionList = () => {
   ];
 
   const [currentTransaction, setCurrentTransaction] =
-    useState<Transaction[]>(initialTransactions);
+    useState<QueryTransaction[]>(initialTransactions);
 
-  const [currentGroupedTransaction, setCurrentGroupedTransaction] = useState<
-    GroupedTransactions[]
-  >([]);
   const { incomeData, expenseData } = useDoughnutCharts(initialTransactions);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
   const [editTransactionId, setEditTransactionId] = useState("");
 
-  const [useIncomeData, setUseIncomeData] = useState(true);
-  const [useExpenseData, setUseExpenseData] = useState(true);
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([
-    "ช้อปปิ้งและของใช้",
-    "อาหาร",
-    "เดินทาง",
-    "บันเทิง",
-    "ค่าใช้จ่ายประจำ",
-    "สุขภาพและยา",
-    "ซ่อมบำรุง",
-    "ธุรกิจ",
-    "ของขวัญ",
-    "เงินกู้ยืม",
-    "เงินเดือน",
-    "รายได้พิเศษ",
-    "อื่น ๆ",
-  ]);
-  const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>([]);
+  const {
+    useIncomeData,
+    useExpenseData,
+    selectedLabels,
+    targetStartDate,
+    targetEndDate,
+    totalIncome,
+    totalExpense,
+    netBalance,
+    setSelectedLabels,
+    setTargetEndDate,
+    setTargetStartDate,
+    setUseExpenseData,
+    sortedFilteredTransactions,
+    setUseIncomeData,
+  } = useFilteredTransaction(initialTransactions);
+  const {
+    setCurrentPage,
+    currentPage,
+    paginatedTransactions,
+    totalPages,
+    pages,
+  } = usePaginationTransaction(sortedFilteredTransactions);
+
   const hasIncomeData = incomeData.datasets[0].data.some((v) => v > 0);
   const hasExpenseData = expenseData.datasets[0].data.some((v) => v > 0);
-  useEffect(() => {
-    setCurrentGroupedTransaction(groupTransactionsByDate(initialTransactions));
-    console.log(currentGroupedTransaction);
-  }, []);
+
   useEffect(() => {
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -348,93 +319,11 @@ const TransactionList = () => {
     return res;
   };
 
-  const { totalIncome, totalExpense, netBalance } = useMemo(() => {
-    let income = 0;
-    let expense = 0;
+  // Set Start Date ในส่วนรายการ ให้ตรงกับ Start Date ที่ Fetch มาในตอนต้น
 
-    initialTransactions.forEach((item) => {
-      if (item.type === "income") {
-        income += item.amount;
-      } else if (item.type === "expense") {
-        // ใช้ Math.abs เพื่อให้มั่นใจว่าค่ารายจ่ายสะสมเป็นบวกก่อน (หรือจะใช้วิธีบวกตรง ๆ ก็ได้ครับ)
-        expense += Math.abs(item.amount);
-      }
-    });
-
-    return {
-      totalIncome: income,
-      totalExpense: expense,
-      netBalance: income - expense, // ยอดคงเหลือสุทธิ
-    };
-  }, [initialTransactions]);
-
-  useEffect(() => {
-    setViewStartDateTime(startDateTime);
-    setViewEndDateTime(endDateTime);
-  }, []);
-
-  const handleToggle = (label: string) => {
-    setTempCategoryFilter((prev) =>
-      prev.includes(label)
-        ? prev.filter((item) => item !== label)
-        : [...prev, label],
-    );
-  };
   // useEffect(() => {
   //   fetchDataByRange()
   // }, [startDateTime, endDateTime]); // 👈 สำคัญมาก
-
-  const filteredTransactions = useMemo(() => {
-    return initialTransactions.filter((item) => {
-      if (item.type === "income" && !useIncomeData) return false;
-      if (item.type === "expense" && !useExpenseData) return false;
-
-      if (
-        selectedLabels.length > 0 &&
-        (!item.label || !selectedLabels.includes(item.label))
-      ) {
-        return false;
-      }
-
-      const itemTime = item.time ? new Date(item.time).getTime() : 0;
-
-      const start = viewStartDateTime
-        ? new Date(viewStartDateTime).setHours(0, 0, 0, 0)
-        : 0;
-
-      const end = viewEndDateTime
-        ? new Date(viewEndDateTime).setHours(23, 59, 59, 999)
-        : Infinity;
-
-      return itemTime >= start && itemTime <= end;
-    });
-  }, [
-    initialTransactions,
-    useIncomeData,
-    useExpenseData,
-    selectedLabels,
-    viewStartDateTime,
-    viewEndDateTime,
-  ]);
-
-  const totalPages = useMemo(() => {
-    return Math.ceil(filteredTransactions.length / itemsPerPage);
-  }, [filteredTransactions, itemsPerPage]);
-
-  const pages = useMemo(() => {
-    return getOwnPagination(currentPage, totalPages);
-  }, [currentPage, totalPages]);
-
-  const sortedTransactions = useMemo(() => {
-    return [...filteredTransactions].sort(
-      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
-    );
-  }, [filteredTransactions]);
-
-  const paginatedTransactions = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return sortedTransactions.slice(startIndex, startIndex + itemsPerPage);
-  }, [sortedTransactions, currentPage, itemsPerPage]);
 
   const groupedData = useMemo(() => {
     return groupTransactionsByDate(paginatedTransactions);
@@ -442,85 +331,12 @@ const TransactionList = () => {
 
   return (
     <>
-      <input type="checkbox" id="filter_by_category" className="modal-toggle" />
-      <div className="modal" role="dialog">
-        <div className="modal-box rounded-4xl">
-          <h3 className="text-3xl font-bold text-center text-gray-800">
-            เลือกหมวดหมู่ที่ต้องการแสดง
-          </h3>
-          <div className="mt-4">
-            <div className="text-2xl mb-3">รายจ่าย</div>
-            <div className="space-x-3 space-y-3">
-              {EXPENSE_CATEGORIES_TH.map((id) => {
-                if (id === "อื่น ๆ") return;
-                return (
-                  <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={tempCategoryFilter.includes(id)}
-                      onChange={() => handleToggle(id)}
-                      className="checkbox-lg checkbox text-2xl"
-                    />
-                    <BackgroundIcon category={id}></BackgroundIcon>
-                    <div className="">{id}</div>
-                  </label>
-                );
-              })}
-            </div>
-            <div className="text-2xl mb-3">รายรับ</div>
-            <div className="space-x-3 space-y-3">
-              {INCOME_CATEGORIES_TH.map((id) => {
-                if (id === "อื่น ๆ") return;
-                return (
-                  <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={tempCategoryFilter.includes(id)}
-                      onChange={() => handleToggle(id)}
-                      className="checkbox-lg checkbox text-2xl"
-                    />
-                    <BackgroundIcon category={id}></BackgroundIcon>
-                    <div className="">{id}</div>
-                  </label>
-                );
-              })}
-            </div>
-            <div className="text-2xl mb-3">อื่น ๆ</div>
-            <div className="space-x-3 space-y-3">
-              <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={tempCategoryFilter.includes("อื่น ๆ")}
-                  onChange={() => handleToggle("อื่น ๆ")}
-                  className="checkbox-lg checkbox text-2xl"
-                />
-                อื่น ๆ
-              </label>
-            </div>
-          </div>
-
-          <div className="mt-7 flex gap-3">
-            <label
-              htmlFor="filter_by_category"
-              className="btn btn-soft btn-error rounded-4xl flex-1 text-2xl"
-            >
-              ปิด
-            </label>
-            <label
-              htmlFor="filter_by_category"
-              className="btn btn-soft btn-success rounded-4xl flex-1 text-2xl"
-              onClick={() => {
-                setSelectedLabels(tempCategoryFilter);
-              }}
-            >
-              ยืนยัน
-            </label>
-          </div>
-        </div>
-        <label className="modal-backdrop" htmlFor="filter_by_category">
-          Close
-        </label>
-      </div>
+      <FilterByCategoryModal
+        selectedLabels={selectedLabels}
+        onConfirm={(labels: string[]) => {
+          setSelectedLabels(labels);
+        }}
+      ></FilterByCategoryModal>
       <input type="checkbox" id="edit_category" className="modal-toggle" />
       <div className="modal" role="dialog">
         <div className="modal-box rounded-4xl">
@@ -591,8 +407,8 @@ const TransactionList = () => {
         <div className="w-full items-center text-center mt-5">
           <button
             onClick={() => {
-              setViewStartDateTime(startDateTime);
-              setViewEndDateTime(endDateTime);
+              setTargetStartDate(startDateTime);
+              setTargetEndDate(endDateTime);
             }}
             className="btn btn-info btn-outline rounded-4xl w-1/2"
           >
@@ -608,39 +424,11 @@ const TransactionList = () => {
 
           <div className="grow border-t border-gray-300"></div>
         </div>
-        <div className="w-full">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
-              <div className="text-2xl font-medium text-gray-600">
-                ยอดคงเหลือ
-              </div>
-              <div
-                className={`text-3xl  mt-2 ${netBalance >= 0 ? "text-success" : "text-error"}`}
-              >
-                {netBalance >= 0 ? "+" : ""}
-                {netBalance.toLocaleString()} THB
-              </div>
-            </div>
-
-            <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
-              <div className="text-2xl font-medium text-gray-600">
-                ค่าใช้จ่ายทั้งหมด
-              </div>
-              <div className="text-error text-3xl  mt-2">
-                -{Math.abs(totalExpense).toLocaleString()} THB
-              </div>
-            </div>
-
-            <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
-              <div className="text-2xl font-medium text-gray-600">
-                รายรับทั้งหมด
-              </div>
-              <div className="text-success text-3xl mt-2">
-                +{totalIncome.toLocaleString()} THB
-              </div>
-            </div>
-          </div>
-        </div>
+        <TransactionOverview
+          income={totalIncome}
+          expense={totalExpense}
+          netBalance={netBalance}
+        ></TransactionOverview>
         {(hasExpenseData || hasIncomeData) && (
           <div className="flex justify-center w-full mt-16 mb-10">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-3xl">
@@ -719,9 +507,6 @@ const TransactionList = () => {
             </div>
 
             <label
-              onClick={() => {
-                setTempCategoryFilter(selectedLabels);
-              }}
               htmlFor="filter_by_category"
               className="btn rounded-4xl text-lg "
             >
@@ -732,9 +517,9 @@ const TransactionList = () => {
           {/* RIGHT (datepicker) */}
           <div className="flex items-center gap-2 w-full md:w-[320px] md:ml-auto justify-center md:justify-end">
             <DatePicker
-              selected={viewStartDateTime}
+              selected={targetStartDate}
               onChange={(e: any) => {
-                setViewStartDateTime(e);
+                setTargetStartDate(e);
               }}
               dateFormat="dd/MM/yyyy"
               calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -744,9 +529,9 @@ const TransactionList = () => {
             <div className="text-gray-600 text-sm whitespace-nowrap">ถึง</div>
 
             <DatePicker
-              selected={viewEndDateTime}
+              selected={targetEndDate}
               onChange={(e: any) => {
-                setViewEndDateTime(e);
+                setTargetEndDate(e);
               }}
               dateFormat="dd/MM/yyyy"
               calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -755,176 +540,19 @@ const TransactionList = () => {
           </div>
         </div>
 
-        <div className="hidden sm:grid bg-white shadow-2xl rounded-4xl cursor-pointer  focus:outline-none focus:ring-2 focus:ring-blue-500 p-7">
-          {/* 1. เอา Object.keys ออก แล้ว map ดื้อ ๆ เลย */}
-          {groupedData.map((group) => {
-            // 2. ดึง group.date (ซึ่งมีค่าเป็น "2026-05-28") ไปส่งให้ฟังก์ชันแปลงวันที่
-            return (
-              <div>
-                <div key={group.date} className="flex items-center gap-4 mb-3">
-                  <div className="text-lg text-gray-700 font-medium whitespace-nowrap">
-                    {formatThaiDate(group.date)}{" "}
-                    {/* ✅ ได้ "28 พ.ค. 69" แน่นอน! */}
-                  </div>
-                  <div className="flex-1 h-[1px] bg-gray-400"></div>
-                </div>
-                {group.items.map((items) => {
-                  return (
-                    <div className="">
-                      <label
-                        onClick={() =>
-                          setEditTransactionId(items.transaction_id)
-                        }
-                        htmlFor="edit_category"
-                        className="hidden sm:grid grid-cols-5 cursor-pointer  mb-1 items-center hover:bg-gray-100 p-2 rounded-4xl"
-                      >
-                        <div>
-                          <div className="flex flex-row gap-4 items-center">
-                            <BackgroundIcon
-                              category={items.label}
-                            ></BackgroundIcon>
-                            <div className="text-gray-700">{items.label}</div>
-                          </div>
-                        </div>
-                        <div className="text-gray-700">{items.title}</div>
-                        <div>-</div>
-                        <div>{items.note}</div>
-                        <div
-                          className={`text-right font-semibold ${items.type === "income" ? "text-success" : "text-error"}`}
-                        >
-                          {items.type === "income" ? "+" : "-"}
-                          {Math.abs(items.amount).toLocaleString()} บาท
-                        </div>
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-          {groupedData.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-xl">
-              ไม่มีรายการธุรกรรมในช่วงนี้
-            </div>
-          )}
+        <PCTransactionList
+          transaction_group_with_date={groupedData}
+        ></PCTransactionList>
+        <MobileTransactionList
+          transaction_group_with_date={groupedData}
+        ></MobileTransactionList>
 
-          <div className="mb-0"></div>
-        </div>
-
-        <div className="bg-white shadow-2xl rounded-4xl p-5 sm:hidden space-y-6">
-          {/* 1. วนลูปกลุ่มข้อมูลรายวัน (Grouped Data) */}
-          {groupedData.map((group) => (
-            <div key={group.date} className="space-y-3">
-              {/* 📅 หัวข้อวันที่ (DATE HEADER) */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xl font-semibold text-gray-500 whitespace-nowrap">
-                  {formatThaiDate(group.date)}{" "}
-                  {/* ✅ แปลงวันที่ เช่น 28 พ.ค. 69 อัตโนมัติ */}
-                </span>
-                <div className="flex-1 h-px bg-gray-200"></div>
-              </div>
-
-              {/* 📝 รายการธุรกรรมภายในวันนั้น (LIST) */}
-              <div className="space-y-4">
-                {group.items.map((item) => {
-                  // คำนวณสี เครื่องหมาย และยอดเงิน เตรียมไว้ล่วงหน้า
-                  const isIncome = item.type === "income";
-                  const textColor = isIncome ? "text-success" : "text-error";
-                  const prefix = isIncome ? "+" : "-";
-
-                  return (
-                    <label
-                      htmlFor="edit_category"
-                      key={item.id}
-                      onClick={() => setEditTransactionId(item.transaction_id)}
-                      className="flex items-center justify-between rounded-4xl p-2 active:bg-gray-100"
-                    >
-                      {/* ฝั่งซ้าย: ไอคอนและข้อมูลสินค้า */}
-                      <div className="flex items-center gap-3">
-                        {/* 🎨 เรียกใช้คอมโพเนนต์ไอคอนแยกตามหมวดหมู่พาสเทล */}
-                        <BackgroundIcon category={item.label} />
-
-                        <div>
-                          <p className="font-semibold text-base-content text-lg">
-                            {item.label}
-                          </p>
-                          <p className="text-lg text-gray-400 mt-0.5">
-                            {item.title}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* ฝั่งขวา: ยอดเงินแยกสีตามประเภท */}
-                      <div
-                        className={`font-semibold text-lg text-right ${textColor}`}
-                      >
-                        {prefix}
-                        {Math.abs(item.amount).toLocaleString()} บาท
-                      </div>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-
-          {groupedData.length === 0 && (
-            <div className="text-center py-8 text-gray-400 text-sm">
-              ไม่มีรายการธุรกรรมในช่วงนี้
-            </div>
-          )}
-        </div>
-        <div className="flex justify-center items-center gap-2 mt-3 bg-white p-4 rounded-4xl shadow-2xl mb-5">
-          {/* Prev */}
-          <button
-            onClick={() => {
-              setCurrentPage((p) => Math.max(p - 1, 1));
-            }}
-            disabled={currentPage === 1}
-            className="px-3 py-1 rounded-xl bg-gray-200 disabled:opacity-50"
-          >
-            Prev
-          </button>
-
-          {/* Pages — fixed width container */}
-          <div className="flex items-center gap-2 w-64 justify-center">
-            {pages.map((p, index) =>
-              p === "..." ? (
-                <span
-                  key={`ellipsis-${index}`}
-                  className="w-8 text-center text-gray-400"
-                >
-                  ...
-                </span>
-              ) : (
-                <button
-                  key={`page-${p}`}
-                  onClick={() => {
-                    setCurrentPage(p);
-                  }}
-                  className={`w-8 h-8 rounded-4xl flex-shrink-0 ${
-                    currentPage === p
-                      ? "btn btn-accent text-white"
-                      : "btn btn-accen bg-gray-100"
-                  }`}
-                >
-                  {p}
-                </button>
-              ),
-            )}
-          </div>
-
-          {/* Next */}
-          <button
-            onClick={() => {
-              setCurrentPage((p) => Math.min(p + 1, totalPages));
-            }}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 btn rounded-xl bg-gray-200 disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
+        <TransactionPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onChangePage={(page) => setCurrentPage(page)}
+          pagePattern={pages}
+        ></TransactionPagination>
         <div className="" ref={bottomRef}></div>
       </div>
     </>
