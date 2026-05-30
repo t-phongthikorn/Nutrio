@@ -287,7 +287,7 @@ const SaveTransaction = () => {
                   }
                 }, 0);
               }}
-              className={`w-1/2 px-6 py-3 text-center uppercase btn btn-soft btn-error rounded-4xl mb-3`}
+              className={`w-1/2 px-6 py-3 text-center uppercase btn  btn-error rounded-4xl mb-3`}
             >
               ลบช่วง
             </button>
@@ -306,14 +306,14 @@ const SaveTransaction = () => {
                   }
                 }, 0);
               }}
-              className={`w-1/2 px-6 py-3 text-center uppercase btn btn-soft btn-info rounded-4xl mb-3`}
+              className={`w-1/2 px-6 py-3 shadow-2xs text-center uppercase btn  btn-info rounded-4xl mb-3`}
             >
               เพิ่มการแบ่งช่วง ( | )
             </button>
           </div>
           <button
             type="submit"
-            className={`w-full px-6 py-3 text-center uppercase btn btn-soft btn-success rounded-4xl `}
+            className={`w-full px-6 py-3 shadow-2xs  text-center uppercase btn btn-success rounded-4xl `}
           >
             เพิ่มรายการ
           </button>

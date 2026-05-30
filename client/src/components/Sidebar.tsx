@@ -21,6 +21,12 @@ const SideBar = () => {
 
   return (
     <>
+    {open && (
+  <div
+    className="fixed inset-0  bg-black/55 opacity-40  z-10 xl:hidden"
+    onClick={() => setOpen(false)}
+  />
+)}
     {/* Open Button (Mobile) */}
     <button
       onClick={() => setOpen(true)}
@@ -68,7 +74,7 @@ const SideBar = () => {
             <span className="font-medium">บันทึก</span>
           </NavLink>
 
-          <NavLink to="/Meal" className={navClass}>
+          <NavLink to="/list" className={navClass}>
             <ListMenuIcon className="w-6 h-6" />
             <span className="font-medium">รายการ</span>
           </NavLink>
@@ -111,7 +117,7 @@ const SideBar = () => {
             <span className="font-medium">บันทึก</span>
           </NavLink>
 
-          <NavLink to="/Meal" className={navClass}>
+          <NavLink to="/list" className={navClass}>
             <ListMenuIcon className="w-6 h-6" />
             <span className="font-medium">รายการ</span>
           </NavLink>

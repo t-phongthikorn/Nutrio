@@ -17,7 +17,7 @@ function App() {
         <Route element={<MainLayout />}>
           <Route element = {<ProtectedRoute/>}>
             <Route path="/" element={<Home />} />
-            <Route path="/meal" element={<Meal />} />
+            <Route path="/list" element={<Meal />} />
             <Route path="/workout" element={<Workout />} />
           </Route>
         </Route>

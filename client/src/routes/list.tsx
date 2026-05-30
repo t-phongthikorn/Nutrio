@@ -8,6 +8,7 @@ import BackgroundIcon from "../components/background_icon";
 import getOwnPagination from "../utils/pagination";
 
 import FoodSvg from "../assets/food.svg";
+import { EXPENSE_CATEGORIES_TH, INCOME_CATEGORIES_TH } from "../types/category";
 
 export interface Transaction {
   id: number;
@@ -294,14 +295,15 @@ const TransactionList = () => {
 
   const [currentTransaction, setCurrentTransaction] =
     useState<Transaction[]>(initialTransactions);
+
   const [currentGroupedTransaction, setCurrentGroupedTransaction] = useState<
     GroupedTransactions[]
   >([]);
   const { incomeData, expenseData } = useDoughnutCharts(initialTransactions);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-  const totalPages = Math.ceil(initialTransactions.length / itemsPerPage);
-  const pages = getOwnPagination(currentPage, totalPages);
+  const [editTransactionId, setEditTransactionId] = useState("");
+
   const [useIncomeData, setUseIncomeData] = useState(true);
   const [useExpenseData, setUseExpenseData] = useState(true);
   const [selectedLabels, setSelectedLabels] = useState<string[]>([
@@ -319,6 +321,7 @@ const TransactionList = () => {
     "รายได้พิเศษ",
     "อื่น ๆ",
   ]);
+  const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>([]);
   const hasIncomeData = incomeData.datasets[0].data.some((v) => v > 0);
   const hasExpenseData = expenseData.datasets[0].data.some((v) => v > 0);
   useEffect(() => {
@@ -345,399 +348,586 @@ const TransactionList = () => {
     return res;
   };
 
+  const { totalIncome, totalExpense, netBalance } = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+
+    initialTransactions.forEach((item) => {
+      if (item.type === "income") {
+        income += item.amount;
+      } else if (item.type === "expense") {
+        // ใช้ Math.abs เพื่อให้มั่นใจว่าค่ารายจ่ายสะสมเป็นบวกก่อน (หรือจะใช้วิธีบวกตรง ๆ ก็ได้ครับ)
+        expense += Math.abs(item.amount);
+      }
+    });
+
+    return {
+      totalIncome: income,
+      totalExpense: expense,
+      netBalance: income - expense, // ยอดคงเหลือสุทธิ
+    };
+  }, [initialTransactions]);
+
+  useEffect(() => {
+    setViewStartDateTime(startDateTime);
+    setViewEndDateTime(endDateTime);
+  }, []);
+
+  const handleToggle = (label: string) => {
+    setTempCategoryFilter((prev) =>
+      prev.includes(label)
+        ? prev.filter((item) => item !== label)
+        : [...prev, label],
+    );
+  };
   // useEffect(() => {
   //   fetchDataByRange()
   // }, [startDateTime, endDateTime]); // 👈 สำคัญมาก
 
-  const groupedData = useMemo(() => {
-    console.log("🔄 กำลังประมวลผลข้อมูลขั้นตอนที่ถูกต้อง...");
-
-    // ─── STEP 1: กรองฟิลเตอร์ทั้งหมดก่อน (จากข้อมูลดิบทั้งหมด initialTransactions) ───
-    const filteredTransactions = initialTransactions.filter((item) => {
-      // 1. กรองตามประเภท (Checkbox)
+  const filteredTransactions = useMemo(() => {
+    return initialTransactions.filter((item) => {
       if (item.type === "income" && !useIncomeData) return false;
       if (item.type === "expense" && !useExpenseData) return false;
 
-      // 2. กรองตามหมวดหมู่ (Label Filter)
-      if (selectedLabels.length > 0 && !selectedLabels.includes(item.label)) {
+      if (
+        selectedLabels.length > 0 &&
+        (!item.label || !selectedLabels.includes(item.label))
+      ) {
         return false;
       }
 
-      // 3. กรองตามช่วงวันที่
-      const itemTime = new Date(item.time).getTime();
+      const itemTime = item.time ? new Date(item.time).getTime() : 0;
+
       const start = viewStartDateTime
         ? new Date(viewStartDateTime).setHours(0, 0, 0, 0)
         : 0;
+
       const end = viewEndDateTime
         ? new Date(viewEndDateTime).setHours(23, 59, 59, 999)
         : Infinity;
 
       return itemTime >= start && itemTime <= end;
     });
-
-    // ─── STEP 2: 🔥 เรียงลำดับข้อมูลที่กรองเสร็จแล้ว จากใหม่สุดไปเก่าสุด ───
-    // ป้องกันปัญหาวันที่กระโดดไปมาข้ามหน้า
-    const sortedTransactions = filteredTransactions.sort(
-      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
-    );
-
-    // ─── STEP 3: 🔥 ทำ Pagination (แบ่งหน้า) จากข้อมูลที่จัดระเบียบเสร็จแล้ว ───
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const pageTransaction = sortedTransactions.slice(
-      startIndex,
-      startIndex + itemsPerPage,
-    );
-
-    // ─── STEP 4: ส่งข้อมูลของหน้านั้น ๆ ไปจัดกลุ่มตามวัน ───
-    return groupTransactionsByDate(pageTransaction);
   }, [
-    initialTransactions, // 💡 แนะนำให้เช็คคำนี้ในโปรเจกต์ด้วยนะครับ (ในโค้ดเดิมแอบใส่ตัวแปรผิดชื่อที่ Dependency)
-    viewStartDateTime,
-    viewEndDateTime,
+    initialTransactions,
     useIncomeData,
     useExpenseData,
     selectedLabels,
-    currentPage,
+    viewStartDateTime,
+    viewEndDateTime,
   ]);
 
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredTransactions.length / itemsPerPage);
+  }, [filteredTransactions, itemsPerPage]);
+
+  const pages = useMemo(() => {
+    return getOwnPagination(currentPage, totalPages);
+  }, [currentPage, totalPages]);
+
+  const sortedTransactions = useMemo(() => {
+    return [...filteredTransactions].sort(
+      (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+    );
+  }, [filteredTransactions]);
+
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedTransactions.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedTransactions, currentPage, itemsPerPage]);
+
+  const groupedData = useMemo(() => {
+    return groupTransactionsByDate(paginatedTransactions);
+  }, [paginatedTransactions]);
+
   return (
-    <div className="max-w-7xl mx-auto p-4">
-      <div className="flex items-center w-full my-6 mt-16">
-        <div className="grow border-t border-gray-300"></div>
-
-        <span className="mx-4 text-gray-600 text-7xl text-center">
-          รายการธุรกรรม
-        </span>
-
-        <div className="grow border-t border-gray-300"></div>
-      </div>
-      <div className="mt-2 text-center text-2xl text-gray-600 mt-">
-        เลือกช่วงเวลา
-      </div>
-
-      <div className="flex justify-center ">
-        <div className="flex flex-col md:flex-row w-1/3 items-center gap-3 mt-2">
-          <DatePicker
-            selected={startDateTime}
-            onChange={(e: any) => {
-              setStartDateTime(e);
-            }}
-            dateFormat="dd/MM/yyyy"
-            calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            className="input input-bordered w-full rounded-4xl flex-1  "
-          />
-
-          <div className="text-center flex-1 text-gray-600 text-lg">ถึง</div>
-
-          <DatePicker
-            selected={endDateTime}
-            onChange={(e: any) => {
-              setEndDateTime(e);
-            }}
-            dateFormat="dd/MM/yyyy"
-            calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            className="input input-bordered w-full rounded-4xl flex-1"
-          />
-        </div>
-      </div>
-      <div className="w-full items-center text-center mt-5">
-        <button className="btn btn-info btn-outline rounded-4xl w-1/2">
-          ค้นหา
-        </button>
-      </div>
-      <div className="flex items-center w-1/2 my-6 mx-auto mt-16">
-        <div className="grow border-t border-gray-300"></div>
-
-        <span className="mx-4 text-gray-600 text-3xl text-center">ภาพรวม</span>
-
-        <div className="grow border-t border-gray-300"></div>
-      </div>
-      <div className="w-full">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
-            <div className="text-2xl  text-gray-600">ยอดคงเหลือ</div>
-            <div className="text-green-500 text-3xl">+3000 THB</div>
-          </div>
-          <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
-            <div className="text-2xl  text-gray-600">ค่าใช้จ่ายทั้งหมด</div>
-            <div className="text-red-400 text-3xl">-3000 THB</div>
-          </div>
-          <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
-            <div className="text-2xl  text-gray-600">รายรับทั้งหมด</div>
-            <div className="text-green-500 text-3xl">+3000 THB</div>
-          </div>
-        </div>
-      </div>
-      {(hasExpenseData || hasIncomeData) && (
-        <div className="flex justify-center w-full mt-16 mb-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-3xl">
-            <div className="bg-white rounded-4xl shadow-xl p-4">
-              <div className="text-center mb-5 text-3xl text-gray-600">
-                รายรับ
-              </div>
-              {hasIncomeData ? (
-                <div className="w-full h-64 sm:h-72 flex justify-center">
-                  <div className="w-full max-w-[280px]">
-                    <Doughnut
-                      data={incomeData as any}
-                      options={options as any}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full text-center mt-32 text-4xl text-gray-300">
-                  ไม่มีรายรับ
-                </div>
-              )}
-            </div>
-            <div className="bg-white rounded-4xl shadow-xl p-4">
-              <div className="text-center mb-5 text-3xl text-gray-600">
-                รายจ่าย
-              </div>
-              {hasExpenseData ? (
-                <div className="w-full h-64 sm:h-72 flex justify-center">
-                  <div className="w-full max-w-[280px]">
-                    <Doughnut
-                      data={expenseData as any}
-                      options={options as any}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full text-center mt-32 text-4xl text-gray-300">
-                  ไม่มีรายจ่าย
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="flex items-center w-1/2 my-6 mx-auto mt-16">
-        <div className="grow border-t border-gray-300"></div>
-
-        <span className="mx-4 text-gray-600 text-3xl text-center">
-          รายละเอียด
-        </span>
-
-        <div className="grow border-t border-gray-300"></div>
-      </div>
-
-      <div className="w-full md:w-auto items-center bg-white shadow-lg flex flex-col md:flex-row md:items-center p-4 rounded-4xl mb-3 gap-4">
-        {/* LEFT (checkbox + button) */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={useIncomeData}
-              onChange={(e) => setUseIncomeData(e.target.checked)}
-              className="checkbox checkbox-md  rounded-lg"
-            />
-            <div className="text-xl">รายรับ</div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={useExpenseData}
-              onChange={(e) => setUseExpenseData(e.target.checked)}
-              className="checkbox checkbox-md rounded-lg"
-            />
-            <div className="text-xl">รายจ่าย</div>
-          </div>
-
-          <button className="btn rounded-4xl text-lg">คัดกรอง</button>
-        </div>
-
-        {/* RIGHT (datepicker) */}
-        <div className="flex items-center gap-2 w-full md:w-[320px] md:ml-auto justify-center md:justify-end">
-          <DatePicker
-            selected={viewStartDateTime}
-            onChange={(e: any) => {
-              setViewStartDateTime(e);
-            }}
-            dateFormat="dd/MM/yyyy"
-            calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            className="input input-bordered w-full rounded-4xl flex-1  "
-          />
-
-          <div className="text-gray-600 text-sm whitespace-nowrap">ถึง</div>
-
-          <DatePicker
-            selected={viewEndDateTime}
-            onChange={(e: any) => {
-              setViewEndDateTime(e);
-            }}
-            dateFormat="dd/MM/yyyy"
-            calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            className="input input-bordered w-full rounded-4xl flex-1  "
-          />
-        </div>
-      </div>
-
-      <div className="hidden sm:grid bg-white shadow-2xl rounded-4xl cursor-pointer  focus:outline-none focus:ring-2 focus:ring-blue-500 p-7">
-        {/* 1. เอา Object.keys ออก แล้ว map ดื้อ ๆ เลย */}
-        {groupedData.map((group) => {
-          // 2. ดึง group.date (ซึ่งมีค่าเป็น "2026-05-28") ไปส่งให้ฟังก์ชันแปลงวันที่
-          return (
-            <div>
-              <div key={group.date} className="flex items-center gap-4 mb-3">
-                <div className="text-lg text-gray-700 font-medium whitespace-nowrap">
-                  {formatThaiDate(group.date)}{" "}
-                  {/* ✅ ได้ "28 พ.ค. 69" แน่นอน! */}
-                </div>
-                <div className="flex-1 h-[1px] bg-gray-400"></div>
-              </div>
-              {group.items.map((items) => {
+    <>
+      <input type="checkbox" id="filter_by_category" className="modal-toggle" />
+      <div className="modal" role="dialog">
+        <div className="modal-box rounded-4xl">
+          <h3 className="text-3xl font-bold text-center text-gray-800">
+            เลือกหมวดหมู่ที่ต้องการแสดง
+          </h3>
+          <div className="mt-4">
+            <div className="text-2xl mb-3">รายจ่าย</div>
+            <div className="space-x-3 space-y-3">
+              {EXPENSE_CATEGORIES_TH.map((id) => {
+                if (id === "อื่น ๆ") return;
                 return (
-                  <div className="">
-                    <div className="hidden sm:grid grid-cols-5  mb-1 items-center hover:bg-gray-100 p-2 rounded-4xl">
-                      <div>
-                        <div className="flex flex-row gap-4 items-center">
-                          <BackgroundIcon
-                            category={items.label}
-                          ></BackgroundIcon>
-                          <div className="text-gray-700">{items.label}</div>
+                  <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={tempCategoryFilter.includes(id)}
+                      onChange={() => handleToggle(id)}
+                      className="checkbox-lg checkbox text-2xl"
+                    />
+                    <BackgroundIcon category={id}></BackgroundIcon>
+                    <div className="">{id}</div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="text-2xl mb-3">รายรับ</div>
+            <div className="space-x-3 space-y-3">
+              {INCOME_CATEGORIES_TH.map((id) => {
+                if (id === "อื่น ๆ") return;
+                return (
+                  <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={tempCategoryFilter.includes(id)}
+                      onChange={() => handleToggle(id)}
+                      className="checkbox-lg checkbox text-2xl"
+                    />
+                    <BackgroundIcon category={id}></BackgroundIcon>
+                    <div className="">{id}</div>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="text-2xl mb-3">อื่น ๆ</div>
+            <div className="space-x-3 space-y-3">
+              <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={tempCategoryFilter.includes("อื่น ๆ")}
+                  onChange={() => handleToggle("อื่น ๆ")}
+                  className="checkbox-lg checkbox text-2xl"
+                />
+                อื่น ๆ
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-7 flex gap-3">
+            <label
+              htmlFor="filter_by_category"
+              className="btn btn-soft btn-error rounded-4xl flex-1 text-2xl"
+            >
+              ปิด
+            </label>
+            <label
+              htmlFor="filter_by_category"
+              className="btn btn-soft btn-success rounded-4xl flex-1 text-2xl"
+              onClick={() => {
+                setSelectedLabels(tempCategoryFilter);
+              }}
+            >
+              ยืนยัน
+            </label>
+          </div>
+        </div>
+        <label className="modal-backdrop" htmlFor="filter_by_category">
+          Close
+        </label>
+      </div>
+      <input type="checkbox" id="edit_category" className="modal-toggle" />
+      <div className="modal" role="dialog">
+        <div className="modal-box rounded-4xl">
+          <h3 className="text-3xl font-bold text-center text-gray-800">
+            คุณต้องการที่จะลบ
+          </h3>
+          <p className="mb-1 text-2xl"></p>
+
+          <div className="mt-7 flex gap-3">
+            <label
+              htmlFor="edit_category"
+              className="btn btn-soft btn-error rounded-4xl flex-1 text-2xl"
+            >
+              ยกเลิก
+            </label>
+            <label
+              htmlFor="edit_category"
+              className="btn btn-soft btn-success rounded-4xl flex-1 text-2xl"
+              onClick={() => {}}
+            >
+              ยืนยัน
+            </label>
+          </div>
+        </div>
+        <label className="modal-backdrop" htmlFor="edit_category">
+          Close
+        </label>
+      </div>
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="flex items-center w-full my-6 mt-16">
+          <div className="grow border-t border-gray-300"></div>
+
+          <span className="mx-4 text-gray-600 text-7xl text-center">
+            รายการธุรกรรม
+          </span>
+
+          <div className="grow border-t border-gray-300"></div>
+        </div>
+        <div className="mt-2 text-center text-2xl text-gray-600 mt-">
+          เลือกช่วงเวลา
+        </div>
+
+        <div className="flex justify-center ">
+          <div className="flex flex-col md:flex-row w-1/3 items-center gap-3 mt-2">
+            <DatePicker
+              selected={startDateTime}
+              onChange={(e: any) => {
+                setStartDateTime(e);
+              }}
+              dateFormat="dd/MM/yyyy"
+              calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input input-bordered w-full rounded-4xl flex-1  "
+            />
+
+            <div className="text-center flex-1 text-gray-600 text-lg">ถึง</div>
+
+            <DatePicker
+              selected={endDateTime}
+              onChange={(e: any) => {
+                setEndDateTime(e);
+              }}
+              dateFormat="dd/MM/yyyy"
+              calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input input-bordered w-full rounded-4xl flex-1"
+            />
+          </div>
+        </div>
+        <div className="w-full items-center text-center mt-5">
+          <button
+            onClick={() => {
+              setViewStartDateTime(startDateTime);
+              setViewEndDateTime(endDateTime);
+            }}
+            className="btn btn-info btn-outline rounded-4xl w-1/2"
+          >
+            ค้นหา
+          </button>
+        </div>
+        <div className="flex items-center w-1/2 my-6 mx-auto mt-16">
+          <div className="grow border-t border-gray-300"></div>
+
+          <span className="mx-4 text-gray-600 text-3xl text-center">
+            ภาพรวม
+          </span>
+
+          <div className="grow border-t border-gray-300"></div>
+        </div>
+        <div className="w-full">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
+              <div className="text-2xl font-medium text-gray-600">
+                ยอดคงเหลือ
+              </div>
+              <div
+                className={`text-3xl  mt-2 ${netBalance >= 0 ? "text-success" : "text-error"}`}
+              >
+                {netBalance >= 0 ? "+" : ""}
+                {netBalance.toLocaleString()} THB
+              </div>
+            </div>
+
+            <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
+              <div className="text-2xl font-medium text-gray-600">
+                ค่าใช้จ่ายทั้งหมด
+              </div>
+              <div className="text-error text-3xl  mt-2">
+                -{Math.abs(totalExpense).toLocaleString()} THB
+              </div>
+            </div>
+
+            <div className="w-full p-6 bg-white rounded-2xl shadow-lg text-center">
+              <div className="text-2xl font-medium text-gray-600">
+                รายรับทั้งหมด
+              </div>
+              <div className="text-success text-3xl mt-2">
+                +{totalIncome.toLocaleString()} THB
+              </div>
+            </div>
+          </div>
+        </div>
+        {(hasExpenseData || hasIncomeData) && (
+          <div className="flex justify-center w-full mt-16 mb-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-3xl">
+              <div className="bg-white rounded-4xl shadow-xl p-4">
+                <div className="text-center mb-5 text-3xl text-gray-600">
+                  รายรับ
+                </div>
+                {hasIncomeData ? (
+                  <div className="w-full h-64 sm:h-72 flex justify-center">
+                    <div className="w-full max-w-[280px]">
+                      <Doughnut
+                        data={incomeData as any}
+                        options={options as any}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full text-center mt-32 text-4xl text-gray-300">
+                    ไม่มีรายรับ
+                  </div>
+                )}
+              </div>
+              <div className="bg-white rounded-4xl shadow-xl p-4">
+                <div className="text-center mb-5 text-3xl text-gray-600">
+                  รายจ่าย
+                </div>
+                {hasExpenseData ? (
+                  <div className="w-full h-64 sm:h-72 flex justify-center">
+                    <div className="w-full max-w-[280px]">
+                      <Doughnut
+                        data={expenseData as any}
+                        options={options as any}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full text-center mt-32 text-4xl text-gray-300">
+                    ไม่มีรายจ่าย
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="flex items-center w-1/2 my-6 mx-auto mt-16">
+          <div className="grow border-t border-gray-300"></div>
+
+          <span className="mx-4 text-gray-600 text-3xl text-center">
+            รายละเอียด
+          </span>
+
+          <div className="grow border-t border-gray-300"></div>
+        </div>
+
+        <div className="w-full md:w-auto items-center bg-white shadow-lg flex flex-col md:flex-row md:items-center p-4 rounded-4xl mb-3 gap-4">
+          {/* LEFT (checkbox + button) */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={useIncomeData}
+                onChange={(e) => setUseIncomeData(e.target.checked)}
+                className="checkbox checkbox-md  rounded-lg"
+              />
+              <div className="text-xl">รายรับ</div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={useExpenseData}
+                onChange={(e) => setUseExpenseData(e.target.checked)}
+                className="checkbox checkbox-md rounded-lg"
+              />
+              <div className="text-xl">รายจ่าย</div>
+            </div>
+
+            <label
+              onClick={() => {
+                setTempCategoryFilter(selectedLabels);
+              }}
+              htmlFor="filter_by_category"
+              className="btn rounded-4xl text-lg "
+            >
+              คัดกรอง
+            </label>
+          </div>
+
+          {/* RIGHT (datepicker) */}
+          <div className="flex items-center gap-2 w-full md:w-[320px] md:ml-auto justify-center md:justify-end">
+            <DatePicker
+              selected={viewStartDateTime}
+              onChange={(e: any) => {
+                setViewStartDateTime(e);
+              }}
+              dateFormat="dd/MM/yyyy"
+              calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input input-bordered w-full rounded-4xl flex-1  "
+            />
+
+            <div className="text-gray-600 text-sm whitespace-nowrap">ถึง</div>
+
+            <DatePicker
+              selected={viewEndDateTime}
+              onChange={(e: any) => {
+                setViewEndDateTime(e);
+              }}
+              dateFormat="dd/MM/yyyy"
+              calendarClassName="w-full px-4 py-3 scale-110 rounded-xl shadow-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input input-bordered w-full rounded-4xl flex-1  "
+            />
+          </div>
+        </div>
+
+        <div className="hidden sm:grid bg-white shadow-2xl rounded-4xl cursor-pointer  focus:outline-none focus:ring-2 focus:ring-blue-500 p-7">
+          {/* 1. เอา Object.keys ออก แล้ว map ดื้อ ๆ เลย */}
+          {groupedData.map((group) => {
+            // 2. ดึง group.date (ซึ่งมีค่าเป็น "2026-05-28") ไปส่งให้ฟังก์ชันแปลงวันที่
+            return (
+              <div>
+                <div key={group.date} className="flex items-center gap-4 mb-3">
+                  <div className="text-lg text-gray-700 font-medium whitespace-nowrap">
+                    {formatThaiDate(group.date)}{" "}
+                    {/* ✅ ได้ "28 พ.ค. 69" แน่นอน! */}
+                  </div>
+                  <div className="flex-1 h-[1px] bg-gray-400"></div>
+                </div>
+                {group.items.map((items) => {
+                  return (
+                    <div className="">
+                      <label
+                        onClick={() =>
+                          setEditTransactionId(items.transaction_id)
+                        }
+                        htmlFor="edit_category"
+                        className="hidden sm:grid grid-cols-5 cursor-pointer  mb-1 items-center hover:bg-gray-100 p-2 rounded-4xl"
+                      >
+                        <div>
+                          <div className="flex flex-row gap-4 items-center">
+                            <BackgroundIcon
+                              category={items.label}
+                            ></BackgroundIcon>
+                            <div className="text-gray-700">{items.label}</div>
+                          </div>
+                        </div>
+                        <div className="text-gray-700">{items.title}</div>
+                        <div>-</div>
+                        <div>{items.note}</div>
+                        <div
+                          className={`text-right font-semibold ${items.type === "income" ? "text-success" : "text-error"}`}
+                        >
+                          {items.type === "income" ? "+" : "-"}
+                          {Math.abs(items.amount).toLocaleString()} บาท
+                        </div>
+                      </label>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {groupedData.length === 0 && (
+            <div className="text-center py-8 text-gray-400 text-xl">
+              ไม่มีรายการธุรกรรมในช่วงนี้
+            </div>
+          )}
+
+          <div className="mb-0"></div>
+        </div>
+
+        <div className="bg-white shadow-2xl rounded-4xl p-5 sm:hidden space-y-6">
+          {/* 1. วนลูปกลุ่มข้อมูลรายวัน (Grouped Data) */}
+          {groupedData.map((group) => (
+            <div key={group.date} className="space-y-3">
+              {/* 📅 หัวข้อวันที่ (DATE HEADER) */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xl font-semibold text-gray-500 whitespace-nowrap">
+                  {formatThaiDate(group.date)}{" "}
+                  {/* ✅ แปลงวันที่ เช่น 28 พ.ค. 69 อัตโนมัติ */}
+                </span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+
+              {/* 📝 รายการธุรกรรมภายในวันนั้น (LIST) */}
+              <div className="space-y-4">
+                {group.items.map((item) => {
+                  // คำนวณสี เครื่องหมาย และยอดเงิน เตรียมไว้ล่วงหน้า
+                  const isIncome = item.type === "income";
+                  const textColor = isIncome ? "text-success" : "text-error";
+                  const prefix = isIncome ? "+" : "-";
+
+                  return (
+                    <label
+                      htmlFor="edit_category"
+                      key={item.id}
+                      onClick={() => setEditTransactionId(item.transaction_id)}
+                      className="flex items-center justify-between rounded-4xl p-2 active:bg-gray-100"
+                    >
+                      {/* ฝั่งซ้าย: ไอคอนและข้อมูลสินค้า */}
+                      <div className="flex items-center gap-3">
+                        {/* 🎨 เรียกใช้คอมโพเนนต์ไอคอนแยกตามหมวดหมู่พาสเทล */}
+                        <BackgroundIcon category={item.label} />
+
+                        <div>
+                          <p className="font-semibold text-base-content text-lg">
+                            {item.label}
+                          </p>
+                          <p className="text-lg text-gray-400 mt-0.5">
+                            {item.title}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-gray-700">{items.title}</div>
-                      <div>-</div>
-                      <div>{items.note}</div>
+
+                      {/* ฝั่งขวา: ยอดเงินแยกสีตามประเภท */}
                       <div
-                        className={`text-right font-semibold ${items.type === "income" ? "text-success" : "text-error"}`}
+                        className={`font-semibold text-lg text-right ${textColor}`}
                       >
-                        {items.type === "income" ? "+" : "-"}
-                        {Math.abs(items.amount).toLocaleString()} บาท
+                        {prefix}
+                        {Math.abs(item.amount).toLocaleString()} บาท
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
-          );
-        })}
-        {groupedData.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-xl">
-            ไม่มีรายการธุรกรรมในช่วงนี้
-          </div>
-        )}
+          ))}
 
-        <div className="mb-0"></div>
-      </div>
-
-      <div className="bg-white shadow-2xl rounded-4xl p-5 sm:hidden space-y-6">
-        {/* 1. วนลูปกลุ่มข้อมูลรายวัน (Grouped Data) */}
-        {groupedData.map((group) => (
-          <div key={group.date} className="space-y-3">
-            {/* 📅 หัวข้อวันที่ (DATE HEADER) */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm font-semibold text-gray-500 whitespace-nowrap">
-                {formatThaiDate(group.date)}{" "}
-                {/* ✅ แปลงวันที่ เช่น 28 พ.ค. 69 อัตโนมัติ */}
-              </span>
-              <div className="flex-1 h-px bg-gray-200"></div>
+          {groupedData.length === 0 && (
+            <div className="text-center py-8 text-gray-400 text-sm">
+              ไม่มีรายการธุรกรรมในช่วงนี้
             </div>
-
-            {/* 📝 รายการธุรกรรมภายในวันนั้น (LIST) */}
-            <div className="space-y-4">
-              {group.items.map((item) => {
-                // คำนวณสี เครื่องหมาย และยอดเงิน เตรียมไว้ล่วงหน้า
-                const isIncome = item.type === "income";
-                const textColor = isIncome ? "text-success" : "text-error";
-                const prefix = isIncome ? "+" : "-";
-
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between"
-                  >
-                    {/* ฝั่งซ้าย: ไอคอนและข้อมูลสินค้า */}
-                    <div className="flex items-center gap-3">
-                      {/* 🎨 เรียกใช้คอมโพเนนต์ไอคอนแยกตามหมวดหมู่พาสเทล */}
-                      <BackgroundIcon category={item.label} />
-
-                      <div>
-                        <p className="font-semibold text-base-content text-sm">
-                          {item.title}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {item.label}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* ฝั่งขวา: ยอดเงินแยกสีตามประเภท */}
-                    <div
-                      className={`font-semibold text-xl text-right ${textColor}`}
-                    >
-                      {prefix}
-                      {Math.abs(item.amount).toLocaleString()} บาท
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {groupedData.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-sm">
-            ไม่มีรายการธุรกรรมในช่วงนี้
-          </div>
-        )}
-      </div>
-      <div className="flex justify-center items-center gap-2 mt-3 bg-white p-4 rounded-4xl shadow-2xl mb-5">
-        {/* Prev */}
-        <button
-          onClick={() => {
-            setCurrentPage((p) => Math.max(p - 1, 1));
-          }}
-          disabled={currentPage === 1}
-          className="px-3 py-1 rounded-xl bg-gray-200 disabled:opacity-50"
-        >
-          Prev
-        </button>
-
-        {/* Pages — fixed width container */}
-        <div className="flex items-center gap-2 w-64 justify-center">
-          {pages.map((p, index) =>
-            p === "..." ? (
-              <span
-                key={`ellipsis-${index}`}
-                className="w-8 text-center text-gray-400"
-              >
-                ...
-              </span>
-            ) : (
-              <button
-                key={`page-${p}`}
-                onClick={() => {
-                  setCurrentPage(p);
-                }}
-                className={`w-8 h-8 rounded-4xl flex-shrink-0 ${
-                  currentPage === p
-                    ? "btn btn-accent text-white"
-                    : "btn btn-accen bg-gray-100"
-                }`}
-              >
-                {p}
-              </button>
-            ),
           )}
         </div>
+        <div className="flex justify-center items-center gap-2 mt-3 bg-white p-4 rounded-4xl shadow-2xl mb-5">
+          {/* Prev */}
+          <button
+            onClick={() => {
+              setCurrentPage((p) => Math.max(p - 1, 1));
+            }}
+            disabled={currentPage === 1}
+            className="px-3 py-1 rounded-xl bg-gray-200 disabled:opacity-50"
+          >
+            Prev
+          </button>
 
-        {/* Next */}
-        <button
-          onClick={() => {
-            setCurrentPage((p) => Math.min(p + 1, totalPages));
-          }}
-          disabled={currentPage === totalPages}
-          className="px-3 py-1 btn rounded-xl bg-gray-200 disabled:opacity-50"
-        >
-          Next
-        </button>
+          {/* Pages — fixed width container */}
+          <div className="flex items-center gap-2 w-64 justify-center">
+            {pages.map((p, index) =>
+              p === "..." ? (
+                <span
+                  key={`ellipsis-${index}`}
+                  className="w-8 text-center text-gray-400"
+                >
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={`page-${p}`}
+                  onClick={() => {
+                    setCurrentPage(p);
+                  }}
+                  className={`w-8 h-8 rounded-4xl flex-shrink-0 ${
+                    currentPage === p
+                      ? "btn btn-accent text-white"
+                      : "btn btn-accen bg-gray-100"
+                  }`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+          </div>
+
+          {/* Next */}
+          <button
+            onClick={() => {
+              setCurrentPage((p) => Math.min(p + 1, totalPages));
+            }}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 btn rounded-xl bg-gray-200 disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+        <div className="" ref={bottomRef}></div>
       </div>
-      <div className="" ref={bottomRef}></div>
-    </div>
+    </>
   );
 };
 
