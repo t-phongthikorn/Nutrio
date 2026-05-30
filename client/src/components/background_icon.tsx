@@ -1,7 +1,7 @@
 // BackgroundIcon.tsx
 import React from 'react';
 import { CATEGORY_ICONS } from '../assets/icon';
-import { CATEGORY_COLORS } from './graph';
+import { CATEGORY_COLORS } from '../types/category';
 
 interface BackgroundIconProps {
   category: string;

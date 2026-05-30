@@ -63,6 +63,25 @@ export const TH_TO_EN_CATEGORIES: Record<string, string> = {
   "อื่น ๆ": "fallback",
 };
 
+
+export const CATEGORY_COLORS: Record<string, string> = {
+  ธุรกิจ: "#1F3A60",
+  ของขวัญ: "#FFC6FF",
+  เงินกู้ยืม: "#B3C5D7",
+  เงินเดือน: "#A3E4D7",
+  รายได้พิเศษ: "#FFD166",
+
+  ช้อปปิ้งและของใช้: "#FFB7B2",
+  อาหาร: "#FCD5A1",
+  เดินทาง: "#A9DEF9",
+  บันเทิง: "#CFBAF0",
+  ค่าใช้จ่ายประจำ: "#E8AEB7",
+  สุขภาพและยา: "#98DDCA",
+  ซ่อมบำรุง: "#D3D3D3",
+
+  "อื่น ๆ": "#9ca3af",
+};
+
 // 4. 🗂️ เวอร์ชันที่รวม CATEGORY ภาษาไทยทั้งหมดไว้ด้วยกัน (ไม่มีตัวซ้ำ)
 // เหมาะมากสำหรับเอาไปทำปุ่ม Filter หรือใช้ลูปเช็คประเภทข้อมูลทั้งหมด
 export const ALL_CATEGORIES_TH = Array.from(
