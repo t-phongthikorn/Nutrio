@@ -1,137 +1,117 @@
-import { GroupedTransactionsWithDate } from "../../types/transaction";
+import { useState } from "react";
+import {
+  GroupedTransactionsWithDate,
+  QueryTransaction,
+} from "../../types/transaction";
 import { formatThaiDate } from "../../utils/dateUtils";
 import BackgroundIcon from "../background_icon";
+import { EditTransaction } from "./transaction_list/EditTransaction";
+import { useEffect } from "react";
 
 interface TransactionListProp {
-    transaction_group_with_date: GroupedTransactionsWithDate[]
+  transaction_group_with_date: GroupedTransactionsWithDate[];
+  onEdit: (transaction: QueryTransaction) => void;
+  onDelete: (id: string) => void;
 }
 
-export const PCTransactionList = ({transaction_group_with_date} : TransactionListProp) => {
+export const TransactionLists = ({
+  transaction_group_with_date, onEdit, onDelete
+}: TransactionListProp) => {
+  const [editTransaction, setEditTransaction] =
+    useState<QueryTransaction | null>(null);
+
+  useEffect(() => {
+    if (editTransaction) {
+      const modal = document.getElementById(
+        "edit_category",
+      ) as HTMLDialogElement;
+
+      modal?.showModal();
+    }
+  }, [editTransaction]);
+
+  const openModal = (item: QueryTransaction) => {
+    setEditTransaction(null); // 👈 บังคับให้เปลี่ยนก่อน
+
+    setTimeout(() => {
+      setEditTransaction(item);
+    }, 0);
+  };
+
   return (
     <>
-      <div className="hidden sm:grid bg-white shadow-2xl rounded-4xl cursor-pointer  focus:outline-none focus:ring-2 focus:ring-blue-500 p-7">
-        {/* 1. เอา Object.keys ออก แล้ว map ดื้อ ๆ เลย */}
-        {transaction_group_with_date.map((group) => {
-          // 2. ดึง group.date (ซึ่งมีค่าเป็น "2026-05-28") ไปส่งให้ฟังก์ชันแปลงวันที่
-          return (
-            <div>
-              <div key={group.date} className="flex items-center gap-4 mb-3">
-                <div className="text-lg text-gray-700 font-medium whitespace-nowrap">
-                  {formatThaiDate(group.date)}{" "}
-                  {/* ✅ ได้ "28 พ.ค. 69" แน่นอน! */}
-                </div>
-                <div className="flex-1 h-[1px] bg-gray-400"></div>
-              </div>
-              {group.items.map((items) => {
-                return (
-                  <div className="">
-                    <label
-                    //   onClick={() => setEditTransactionId(items.transaction_id)}
-                      htmlFor="edit_category"
-                      className="hidden sm:grid grid-cols-5 cursor-pointer  mb-1 items-center hover:bg-gray-100 p-2 rounded-4xl"
-                    >
-                      <div>
-                        <div className="flex flex-row gap-4 items-center">
-                          <BackgroundIcon
-                            category={items.label}
-                          ></BackgroundIcon>
-                          <div className="text-gray-700">{items.label}</div>
-                        </div>
-                      </div>
-                      <div className="text-gray-700">{items.title}</div>
-                      <div>-</div>
-                      <div>{items.note}</div>
-                      <div
-                        className={`text-right font-semibold ${items.type === "income" ? "text-success" : "text-error"}`}
-                      >
-                        {items.type === "income" ? "+" : "-"}
-                        {Math.abs(items.amount).toLocaleString()} บาท
-                      </div>
-                    </label>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-        {transaction_group_with_date.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-xl">
-            ไม่มีรายการธุรกรรมในช่วงนี้
-          </div>
-        )}
+      <EditTransaction
+        key={editTransaction?.id}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        transaction={editTransaction}
+      />
 
-        <div className="mb-0"></div>
+      <div className="bg-white shadow-2xl rounded-4xl p-5 sm:p-7">
+        {transaction_group_with_date.map((group) => (
+          <div key={group.date} className="mb-6 last:mb-0">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="text-lg sm:text-xl font-medium text-gray-500 sm:text-gray-700 whitespace-nowrap">
+                {formatThaiDate(group.date)}
+              </div>
+              <div className="flex-1 h-[1px] bg-gray-200 sm:bg-gray-400"></div>
+            </div>
+
+            <div className="space-y-2 sm:space-y-1">
+              {group.items.map((item) => (
+                <TransactionRow
+                  key={item.id}
+                  item={item}
+                  onSelect={() => openModal(item)}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
 };
 
-export const MobileTransactionList = ({transaction_group_with_date} : TransactionListProp) => {
+/* ==========================================
+   COMPONENT ย่อย: แถวรายการธุรกรรม (Responsive ในตัว)
+   ========================================== */
+interface RowProps {
+  item: QueryTransaction;
+  onSelect: () => void;
+}
+
+const TransactionRow = ({ item, onSelect }: RowProps) => {
+  const isIncome = item.type === "income";
+
   return (
-    <>
-      <div className="bg-white shadow-2xl rounded-4xl p-5 sm:hidden space-y-6">
-        {/* 1. วนลูปกลุ่มข้อมูลรายวัน (Grouped Data) */}
-        {transaction_group_with_date.map((group) => (
-          <div key={group.date} className="space-y-3">
-            {/* 📅 หัวข้อวันที่ (DATE HEADER) */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl font-semibold text-gray-500 whitespace-nowrap">
-                {formatThaiDate(group.date)}{" "}
-                {/* ✅ แปลงวันที่ เช่น 28 พ.ค. 69 อัตโนมัติ */}
-              </span>
-              <div className="flex-1 h-px bg-gray-200"></div>
-            </div>
+    <div
+      onClick={onSelect}
+      className="flex sm:grid sm:grid-cols-4 items-center justify-between rounded-4xl p-2 cursor-pointer hover:bg-gray-100 active:bg-gray-50 text-gray-700"
+    >
+      <div className="flex items-center gap-3 sm:gap-4">
+        <BackgroundIcon category={item.label} />
 
-            {/* 📝 รายการธุรกรรมภายในวันนั้น (LIST) */}
-            <div className="space-y-4">
-              {group.items.map((item) => {
-                // คำนวณสี เครื่องหมาย และยอดเงิน เตรียมไว้ล่วงหน้า
-                const isIncome = item.type === "income";
-                const textColor = isIncome ? "text-success" : "text-error";
-                const prefix = isIncome ? "+" : "-";
+        <div className="flex flex-col">
+          {/* หมวดหมู่ */}
+          <span className="font-semibold sm:font-normal text-lg sm:text-base">
+            {item.label}
+          </span>
 
-                return (
-                  <label
-                    htmlFor="edit_category"
-                    key={item.id}
-                    // onClick={() => setEditTransactionId(item.transaction_id)}
-                    className="flex items-center justify-between rounded-4xl p-2 active:bg-gray-100"
-                  >
-                    {/* ฝั่งซ้าย: ไอคอนและข้อมูลสินค้า */}
-                    <div className="flex items-center gap-3">
-                      {/* 🎨 เรียกใช้คอมโพเนนต์ไอคอนแยกตามหมวดหมู่พาสเทล */}
-                      <BackgroundIcon category={item.label} />
-
-                      <div>
-                        <p className="font-semibold text-base-content text-lg">
-                          {item.label}
-                        </p>
-                        <p className="text-lg text-gray-400 mt-0.5">
-                          {item.title}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* ฝั่งขวา: ยอดเงินแยกสีตามประเภท */}
-                    <div
-                      className={`font-semibold text-lg text-right ${textColor}`}
-                    >
-                      {prefix}
-                      {Math.abs(item.amount).toLocaleString()} บาท
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {transaction_group_with_date.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-sm">
-            ไม่มีรายการธุรกรรมในช่วงนี้
-          </div>
-        )}
+          {/* ชื่อรายการ (อยู่ใต้หมวดหมู่ เฉพาะ mobile) */}
+          <span className="text-sm text-gray-500 sm:hidden">{item.title}</span>
+        </div>
       </div>
-    </>
+
+      <div className="hidden sm:block text-gray-700">{item.title}</div>
+      <div className="hidden sm:block text-gray-500">{item.note}</div>
+
+      <div
+        className={`font-semibold text-lg text-right ${isIncome ? "text-success" : "text-error"}`}
+      >
+        {isIncome ? "+" : "-"}
+        {Math.abs(item.amount).toLocaleString()} บาท
+      </div>
+    </div>
   );
 };

@@ -6,6 +6,8 @@ export const usePaginationTransaction = (transaction: QueryTransaction[]) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
 
+  console.log(transaction)
+
   const totalPages = useMemo(() => {
     return Math.ceil(transaction.length / itemsPerPage);
   }, [transaction, itemsPerPage]);
@@ -18,7 +20,7 @@ export const usePaginationTransaction = (transaction: QueryTransaction[]) => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return transaction.slice(startIndex, startIndex + itemsPerPage);
   }, [transaction, currentPage, itemsPerPage]);
-
+  console.log(paginatedTransactions)
   return {
     totalPages,
     pages,

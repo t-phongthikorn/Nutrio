@@ -42,7 +42,7 @@ export const FilterByCategoryModal = ({
               {EXPENSE_CATEGORIES_TH.map((id) => {
                 if (id === "อื่น ๆ") return;
                 return (
-                  <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
+                  <label key={id} className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
                     <input
                       type="checkbox"
                       checked={tempCategoryFilter.includes(id)}
@@ -60,7 +60,7 @@ export const FilterByCategoryModal = ({
               {INCOME_CATEGORIES_TH.map((id) => {
                 if (id === "อื่น ๆ") return;
                 return (
-                  <label className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
+                  <label key={id} className="label p-4 border border-gray-200 rounded-4xl text-gray-700">
                     <input
                       type="checkbox"
                       checked={tempCategoryFilter.includes(id)}

@@ -93,7 +93,7 @@ function login_layout() {
                   <input
                     type="text"
                     className="w-full outline-none border-none focus:outline-none focus:ring-0 bg-transparent"
-                    autoComplete="off"
+                    autoComplete="email"
                     value={email}
                     ref={userRef}
                     onChange={(e) => {
@@ -124,7 +124,7 @@ function login_layout() {
                   <input
                     type={visibility ? "text" : "password"}
                     className="w-full outline-none border-none focus:outline-none focus:ring-0 bg-transparent"
-                    autoComplete="off"
+                    autoComplete="password"
                     value={password}
                     onChange={(e) => {
                       const filtered = e.target.value.replace(

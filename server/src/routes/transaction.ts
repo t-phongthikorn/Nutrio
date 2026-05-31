@@ -8,7 +8,7 @@ console.log("Auth routes loaded");
 import dotenv from "dotenv";
 import supabase from "../api/supabaseClient";
 import { authenticateToken, AuthRequest } from "../api/middleware";
-import { insertTransactions } from "../services/transaction_service";
+import { deleteTransaction, editTransactions, insertTransactions } from "../services/transaction_service";
 dotenv.config();
 
 router.post("/insert", authenticateToken, async (req: AuthRequest, res) => {
@@ -46,6 +46,63 @@ router.post("/insert", authenticateToken, async (req: AuthRequest, res) => {
 
     return res.status(500).json({
       message: "บันทึกล้มเหลว",
+      error: err.message,
+    });
+  }
+});
+
+router.post("/edit", authenticateToken, async (req: AuthRequest, res) => {
+  console.log(req)
+  try {
+    const userId = req.user!.user_id;
+
+    if (!req.body || req.body.length === 0) {
+      return res.status(400).json({
+        message: "Body ไม่มีข้อมูล",
+      });
+    }
+
+
+    const result = await editTransactions(req.body, userId);
+
+    return res.status(200).json({
+      message: "แก้ไขสำเร็จ",
+      data: result,
+    });
+  } catch (err: any) {
+    console.error("Edit error:", err);
+
+    return res.status(500).json({
+      message: "แก้ไขล้มเหลว",
+      error: err.message,
+    });
+  }
+});
+
+router.post("/delete", authenticateToken, async (req: AuthRequest, res) => {
+  console.log(req)
+  try {
+    const userId = req.user!.user_id;
+
+    const { transaction_id } = req.body;
+
+    if (!transaction_id) {
+      return res.status(400).json({
+        message: "transaction_id is required",
+      });
+    }
+
+    const result = await deleteTransaction(transaction_id, userId);
+
+    return res.status(200).json({
+      message: "ลบสำเร็จ",
+      data: result,
+    });
+  } catch (err: any) {
+    console.error("Delete error:", err);
+
+    return res.status(500).json({
+      message: "ลบล้มเหลว",
       error: err.message,
     });
   }

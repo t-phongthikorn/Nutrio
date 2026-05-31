@@ -38,7 +38,7 @@ export default function ProtectedRoute() {
         <button
                 type="submit"
                 onClick={() => navigate("/login")}
-                className={`w-1/2 px-6 py-3 text-center uppercase transition-all duration-500
+                className={` flex-1 px-6 py-3 text-center uppercase transition-all duration-500
     bg-size-[150%_auto] bg-linear-to-r from-[#70fad3] via-[#38afd6] to-[#38afd6] cursor-pointer hover:bg-right hover:scale-[1.02]}
     text-white shadow-[0_0_20px_#eee] rounded-4xl
      outline-none border-none 
@@ -49,8 +49,8 @@ export default function ProtectedRoute() {
 
         {/* Register (สีขาว) */}
         <button
-          className="flex-1 rounded-2xl text-lg font-semibold py-3 
-          bg-white border border-gray-300 rounded-4xl text-gray-700 
+          className="flex-1  text-lg font-semibold py-3 
+          bg-white border border-gray-300 rounded-4xl btn text-gray-700 
           hover:bg-gray-100 transition"
           onClick={() => navigate("/register")}
         >

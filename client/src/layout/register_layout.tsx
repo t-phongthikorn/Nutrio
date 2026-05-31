@@ -13,9 +13,9 @@ function login_layout() {
     <>
       <div className="flex items-center justify-center min-h-screen p-4">
   <div
-    className="w-full max-w-md rounded-4xl bg-gradient-to-r from-[#ffcdd5]
-    via-[#ffc3a0]
-    to-[#FFAFBD] p-[3px]"
+    className="w-full max-w-md rounded-4xl bg-gradient-to-r from-[#99eed6]
+    via-[#b9e6e7]
+    to-[#5bc7eb] p-[3px]"
   >
     <div className="rounded-4xl bg-white backdrop-blur-xl relative flex flex-col p-6 sm:p-8 space-y-8 shadow-2xl">
       
@@ -97,12 +97,12 @@ function login_layout() {
       </div>
       <button
         className="w-full px-6 py-3 text-center uppercase transition-all duration-500
-        bg-size-[200%_auto] bg-linear-to-r from-[#ffcdd5] via-[#ffc3a0] to-[#FFAFBD]
+        bg-size-[200%_auto] bg-linear-to-r from-[#70fad3] via-[#38afd6] to-[#38afd6]
         text-white shadow-[0_0_20px_#eee] rounded-4xl
         cursor-pointer outline-none border-none hover:bg-right
         kanit-bold hover:scale-[1.02]"
       >
-        เข้าสู่ระบบ
+        สมัครสมาชิก
       </button>
     </div>
   </div>

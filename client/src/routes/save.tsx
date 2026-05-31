@@ -4,6 +4,11 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useCopyToClipboard } from "@samithahansaka/clipboard";
 import BackgroundIcon from "../components/background_icon";
+import Select, {
+  components,
+  OptionProps,
+  SingleValueProps,
+} from "react-select";
 
 interface LabelItem {
   text: string;
@@ -36,6 +41,34 @@ interface FullTransaction {
 }
 
 type TransactionMap = Record<string, FullTransaction>;
+
+interface CategoryOption {
+  value: string;
+  label: string;
+}
+
+const formatOptions = (categories: string[]): CategoryOption[] =>
+  categories.map((c) => ({ value: c, label: c }));
+
+// Custom Option (ใน dropdown)
+const CustomOption = (props: OptionProps<CategoryOption>) => (
+  <components.Option {...props}>
+    <div className="flex flex-row gap-3 items-center">
+      <BackgroundIcon category={props.data.value} />
+      <span className="text-lg">{props.data.label}</span>
+    </div>
+  </components.Option>
+);
+
+// Custom SingleValue (ตัวที่เลือกแล้ว)
+const CustomSingleValue = (props: SingleValueProps<CategoryOption>) => (
+  <components.SingleValue {...props}>
+    <div className="flex flex-row gap-3 items-center">
+      <BackgroundIcon category={props.data.value} />
+      <span className="text-lg">{props.data.label}</span>
+    </div>
+  </components.SingleValue>
+);
 
 const transformTransactionMap = (
   data: TransactionMap,
@@ -81,7 +114,14 @@ const SaveTransaction = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const CategoryMap = {
-    income: ["ธุรกิจ", "ของขวัญ", "เงินกู้ยืม", "เงินเดือน", "รายได้พิเศษ", "อื่น ๆ"],
+    income: [
+      "ธุรกิจ",
+      "ของขวัญ",
+      "เงินกู้ยืม",
+      "เงินเดือน",
+      "รายได้พิเศษ",
+      "อื่น ๆ",
+    ],
     expense: [
       "ช้อปปิ้งและของใช้",
       "อาหาร",
@@ -90,7 +130,7 @@ const SaveTransaction = () => {
       "ค่าใช้จ่ายประจำ",
       "สุขภาพและยา",
       "ซ่อมบำรุง",
-      "อื่น ๆ"
+      "อื่น ๆ",
     ],
   };
 
@@ -261,7 +301,7 @@ const SaveTransaction = () => {
           <div className="p-4  w-full">
             <textarea
               placeholder={`เช่น -70 ฝรั่ง "ฝรั่ง 2 กิโลกรัม" | +3,000 เงินเดือน`}
-              value={currentCommand}
+              value={currentCommand ?? ""}
               ref={textareaRef}
               onChange={(e) => setCurrentCommand(e.target.value)}
               className="w-full px-4 pt-4 text-2xl border border-gray-300 rounded-full text-center outline-none bg-white shadow-sm"
@@ -547,44 +587,45 @@ const SaveTransaction = () => {
 
                               <td>
                                 {isEditing ? (
-                                  <select
-                                    value={transaction.label}
-                                    onChange={(
-                                      e: React.ChangeEvent<HTMLSelectElement>,
-                                    ) => {
-                                      const label = e.target.value;
+                                  <Select<CategoryOption>
+                                    value={{
+                                      value: transaction.label,
+                                      label: transaction.label,
+                                    }}
+                                    onChange={(selected) => {
+                                      if (!selected) return;
                                       setTransactionMap((prev) => ({
                                         ...prev,
                                         [id]: {
                                           ...prev[id],
-                                          label,
+                                          label: selected.value,
                                         },
                                       }));
                                     }}
-                                    className="select select-lg whitespace-nowrap w-full justify-center rounded-4xl  "
-                                  >
-                                    {transaction.type === "income"
-                                      ? CategoryMap["income"].map((c) => (
-                                          <option key={c}>
-                                            <div className="flex flex-row gap-4 items-center">
-                                              <BackgroundIcon
-                                                category={c}
-                                              ></BackgroundIcon>
-                                              <div className="">{c}</div>
-                                            </div>
-                                          </option>
-                                        ))
-                                      : CategoryMap["expense"].map((c) => (
-                                          <option key={c}>
-                                            <div className="flex flex-row gap-4 items-center">
-                                              <BackgroundIcon
-                                                category={c}
-                                              ></BackgroundIcon>
-                                              <div className="">{c}</div>
-                                            </div>
-                                          </option>
-                                        ))}
-                                  </select>
+                                    options={formatOptions(
+                                      transaction.type === "income"
+                                        ? CategoryMap["income"]
+                                        : CategoryMap["expense"],
+                                    )}
+                                    components={{
+                                      Option: CustomOption,
+                                      SingleValue: CustomSingleValue,
+                                    }}
+                                    isSearchable={false}
+                                    unstyled
+                                    menuPlacement="top"
+                                    menuPosition="fixed"
+                                    menuPortalTarget={document.body}
+                                    classNames={{
+                                      control: () =>
+                                        "border border-base-300 bg-base-100 rounded-full px-3 py-1 min-h-[48px] min-w-[180px] cursor-pointer hover:border-base-400",
+                                      menu: () =>
+                                        "bg-base-100 border border-base-300 rounded-2xl shadow-lg mt-1 overflow-hidden z-[9999] min-w-[220px]",
+                                      option: ({ isFocused, isSelected }) =>
+                                        `px-3 py-2 cursor-pointer ${isSelected || isFocused ? "bg-base-200" : ""}`,
+                                      menuList: () => "py-1",
+                                    }}
+                                  />
                                 ) : (
                                   <span className="badge badge-outline text-base whitespace-nowrap w-full p-3">
                                     {transaction.label}
@@ -617,7 +658,7 @@ const SaveTransaction = () => {
                                 {isEditing ? (
                                   <textarea
                                     placeholder="โน๊ต"
-                                    value={transaction.note}
+                                    value={transaction.note ?? ""}
                                     onChange={(
                                       e: React.ChangeEvent<HTMLTextAreaElement>,
                                     ) => {
